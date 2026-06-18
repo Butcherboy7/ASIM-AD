@@ -9,11 +9,13 @@ A sophisticated multi-agent AI system that provides intelligent stock analysis a
 - **🎯 Sector-Based Analysis**: Choose from IT, Banking, Auto, Pharma, Green Energy, and Diversified sectors
 - **⚖️ Customizable Weighting**: Adjust balance between fundamental and sentiment analysis (0-100%)
 - **📊 Real-Time Data**: Live financial metrics via yfinance API
-- **📰 News Sentiment**: Real-time news sentiment analysis via Yahoo Finance, Google RSS, and Yahoo RSS feeds (no API key required, fallback news support)
+- **📰 News Sentiment**: Real-time news sentiment analysis via Yahoo Finance, Google RSS, and Yahoo RSS feeds (no API key required)
 - **⚡ Parallel Execution**: Multi-threaded parallel fetching using `ThreadPoolExecutor` to load multiple stocks concurrently (4-5x speedup)
-- **💾 Smart Caching**: Streamlit-level caching (`@st.cache_data`) for stock queries, enabling instant loading of cached tickers and zero-latency slider weighting adjustments
+- **💾 Smart Caching & Lazy Load**: Streamlit-level caching (`@st.cache_data`) for stock queries and lazy NLTK/NLP loading, enabling instant boot times and zero-latency slider weighting adjustments
 - **🔍 Interactive Responsive UI**: Sleek glassmorphic dark theme featuring optimized Plotly radar charts, responsive layout sizing, and detailed analysis cards
+- **📰 Referenced News Display**: Dedicated collapsible news reference section inside each card, showing article headers (clickable links), sources, dates, and color-coded sentiment scores
 - **📈 Dynamic Progress**: Real-time progress updates tracking concurrent agent execution without arbitrary delays
+- **🛠️ DOM Layout & Scroll Fixes**: Resolved all container height collapses and iframe truncation by utilizing native Streamlit forms and applying explicit viewport scrolling constraints (`overflow-y: auto`)
 
 ## 🚀 Quick Start
 
