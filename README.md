@@ -105,67 +105,59 @@ Use the interactive slider to adjust weighting:
 
 ## 🔧 Configuration
 
-### Environment Variables
-```bash
-NEWS_API_KEY=your_newsapi_key_here
-```
-
 ### Streamlit Configuration
-Create `.streamlit/config.toml`:
+Create `.streamlit/config.toml` (this is automatically set up in the workspace):
 ```toml
+[theme]
+primaryColor = "#3b82f6"
+backgroundColor = "#050505"
+secondaryBackgroundColor = "#111111"
+textColor = "#ffffff"
+font = "sans serif"
+
 [server]
 headless = true
-address = "0.0.0.0"
-port = 5000
-
-[theme]
-primaryColor = "#667eea"
-backgroundColor = "#0e1117"
-secondaryBackgroundColor = "#262730"
-textColor = "#fafafa"
+enableCORS = false
+enableXsrfProtection = false
 ```
 
 ## 📊 API Reference
 
-### External APIs Used
+### External APIs & Feeds Used (No Keys Required)
 
-1. **yfinance**: Stock fundamental data (no authentication required)
+1. **yfinance**: Stock fundamental data and company-specific news
    - Financial ratios (PE, PB, ROE)
    - Market cap and pricing data
-   - Company information
+   - Company information and basic news links
 
-2. **NewsAPI**: Latest news headlines (requires free API key)
-   - Company-specific news search
-   - Real-time market sentiment
-   - Article content analysis
+2. **Google News RSS Feed**: Public dynamic search feed
+   - Fetched concurrently in the background
+   - Retrieves real-time regional global news headlines
 
-3. **NLTK**: Natural language processing
-   - VADER sentiment analyzer
-   - Text preprocessing and tokenization
+3. **Yahoo Finance RSS Feed**: headline RSS endpoints
+   - Fetched concurrently for supplementary news coverage
 
-4. **spaCy**: Advanced NLP pipeline
-   - Named entity recognition
-   - Advanced text analysis
+4. **NLTK (VADER)**: Local NLP processing
+   - Rule-based sentiment intensity analysis running locally (no API calls)
 
 ## 🎯 Scoring System
 
 ### Fundamental Scoring (0-100)
-- **PE Ratio**: Optimized for Indian market (15-25 range)
-- **PB Ratio**: Book value assessment (1-3 range)
+- **PE Ratio**: Valuation scoring (optimized ranges)
+- **PB Ratio**: Book value assessment
 - **ROE**: Return on equity evaluation (>15% preferred)
 - **Debt-to-Equity**: Financial stability (lower is better)
 - **Profit Margins**: Operational efficiency
 
 ### Sentiment Scoring (0-100)
-- **Article Coverage**: Number of recent news articles
-- **Sentiment Ratio**: Positive vs negative news balance
-- **Volatility**: Consistency of sentiment over time
-- **Entity Recognition**: Company mention frequency
+- **Article Coverage**: Quantity of unique news articles found
+- **Sentiment Ratio**: Balance of positive vs negative compound scores
+- **Volatility**: Sentiment variation across articles
 
 ### Final Recommendations
 - **BUY**: Score ≥ 70
-- **HOLD**: Score 50-69
-- **SELL**: Score < 50
+- **HOLD**: Score 40-69
+- **SELL**: Score < 40
 
 ## 🚧 Development
 
@@ -201,17 +193,17 @@ ai-stock-advisor/
 ## 🔒 Security & Limitations
 
 ### Security Considerations
-- API keys are handled via environment variables
-- No financial advice disclaimer required
-- Rate limiting implemented for external APIs
+- No API keys or credentials required (uses public feeds only)
+- No financial advice disclaimer included
+- Rate limiting considerations implemented for public API requests
 - Input validation for all user parameters
 
 ### Current Limitations
 - **Demo Purpose**: Built for hackathons, not production trading
 - **Indian Market Focus**: Optimized for NSE-listed stocks
-- **API Dependencies**: Requires stable internet and valid API keys
+- **API Dependencies**: Requires stable internet connection to fetch real-time data
 - **No Real-time Trading**: Analysis only, no order execution
-- **Cache TTL**: 1-hour cache may not reflect rapid market changes
+- **Cache TTL**: 10-minute cache for fundamentals and 30-minute cache for sentiment data
 
 ## 🤝 Contributing
 
