@@ -1,771 +1,591 @@
 import streamlit as st
+import time
 import pandas as pd
 import numpy as np
-import time
-from datetime import datetime
-import os
-import plotly.express as px
 import plotly.graph_objects as go
+from datetime import datetime
 
-# Import our custom agents
+# Import backend agents
 from agents.screening_agent import ScreeningAgent
 from agents.fundamental_agent import FundamentalAgent
 from agents.sentiment_agent import SentimentAgent
 from agents.aggregator_agent import AggregatorAgent
-from utils.cache_manager import CacheManager
-from utils.data_normalizer import DataNormalizer
 
-# Configure page
+# Set page config
 st.set_page_config(
-    page_title="🤖 AI Stock Advisor",
-    page_icon="🤖",
+    page_title="StockSage AI",
+    page_icon="🔮",
     layout="wide",
     initial_sidebar_state="collapsed"
 )
 
-# Initialize cache manager
-@st.cache_resource
-def get_cache_manager():
-    return CacheManager()
+# Custom CSS for high-end glassmorphic theme
+st.markdown("""
+<style>
+    @import url('https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600;700;800&family=JetBrains+Mono:wght@400;700&display=swap');
+
+    /* Global styles */
+    html, body, [data-testid="stAppViewContainer"], [data-testid="stMain"], .main {
+        background-color: #050505 !important;
+        font-family: 'Outfit', sans-serif !important;
+        color: #ffffff !important;
+        overflow-y: auto !important;
+    }
+    
+    /* Radial glows for 3D depth */
+    [data-testid="stAppViewContainer"]::before {
+        content: "";
+        position: fixed;
+        top: -20%;
+        left: -10%;
+        width: 60vw;
+        height: 60vw;
+        border-radius: 50%;
+        background: radial-gradient(circle, rgba(30,27,75,0.4) 0%, rgba(5,5,5,0) 70%);
+        pointer-events: none;
+        z-index: 0;
+    }
+    
+    [data-testid="stAppViewContainer"]::after {
+        content: "";
+        position: fixed;
+        bottom: -20%;
+        right: -10%;
+        width: 70vw;
+        height: 70vw;
+        border-radius: 50%;
+        background: radial-gradient(circle, rgba(76,29,149,0.3) 0%, rgba(5,5,5,0) 70%);
+        pointer-events: none;
+        z-index: 0;
+    }
+
+    /* Main Container padding */
+    .block-container {
+        padding-top: 2rem !important;
+        padding-bottom: 2rem !important;
+        z-index: 10;
+    }
+
+    /* Header styling */
+    .header-container {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        margin-bottom: 30px;
+    }
+    .header-logo {
+        width: 40px;
+        height: 40px;
+        border-radius: 12px;
+        background: linear-gradient(135deg, #3b82f6, #8b5cf6);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        box-shadow: 0 4px 15px rgba(59,130,246,0.3);
+        font-weight: bold;
+        font-size: 20px;
+    }
+    .header-title {
+        font-size: 28px;
+        font-weight: 800;
+        letter-spacing: -0.5px;
+        background: linear-gradient(to right, #ffffff, #9ca3af);
+        -webkit-background-clip: text;
+        -webkit-text-fill-color: transparent;
+        margin: 0;
+    }
+
+    /* Glassmorphic Panel */
+    .glass-panel {
+        background: rgba(255, 255, 255, 0.02) !important;
+        border: 1px solid rgba(255, 255, 255, 0.06) !important;
+        backdrop-filter: blur(24px) !important;
+        border-radius: 16px !important;
+        padding: 24px !important;
+        box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.5) !important;
+        margin-bottom: 24px;
+        position: relative;
+        overflow: hidden;
+    }
+    
+    .glass-panel::before {
+        content: "";
+        position: absolute;
+        top: 0;
+        left: 0;
+        right: 0;
+        height: 1px;
+        background: linear-gradient(90deg, rgba(255,255,255,0.1) 0%, rgba(255,255,255,0.02) 100%);
+    }
+
+    /* Sidebar controls styling */
+    div[data-testid="stForm"] {
+        background: rgba(255, 255, 255, 0.02) !important;
+        border: 1px solid rgba(255, 255, 255, 0.06) !important;
+        backdrop-filter: blur(24px) !important;
+        border-radius: 16px !important;
+        padding: 24px !important;
+        box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.5) !important;
+        margin-bottom: 24px;
+    }
+
+    /* Hero section styling */
+    .hero-title {
+        font-size: 64px;
+        font-weight: 900;
+        line-height: 1.1;
+        letter-spacing: -2px;
+        margin-bottom: 16px;
+    }
+    .hero-gradient {
+        background: linear-gradient(135deg, #60a5fa, #a78bfa);
+        -webkit-background-clip: text;
+        -webkit-text-fill-color: transparent;
+    }
+    .hero-subtitle {
+        font-size: 20px;
+        color: #9ca3af;
+        line-height: 1.6;
+        max-width: 500px;
+        margin-bottom: 30px;
+    }
+
+    /* Custom Streamlit Element overrides */
+    div[data-baseweb="select"] > div, input, select, textarea {
+        background-color: rgba(0, 0, 0, 0.5) !important;
+        border: 1px solid rgba(255, 255, 255, 0.1) !important;
+        color: white !important;
+        border-radius: 8px !important;
+    }
+    
+    /* Stat Cards */
+    .stat-container {
+        display: grid;
+        grid-template-columns: repeat(4, 1fr);
+        gap: 16px;
+        margin-bottom: 24px;
+    }
+    .stat-card {
+        background: rgba(255, 255, 255, 0.02);
+        border: 1px solid rgba(255, 255, 255, 0.06);
+        border-radius: 12px;
+        padding: 20px;
+        text-align: center;
+    }
+    .stat-value {
+        font-size: 32px;
+        font-weight: 700;
+        margin-bottom: 4px;
+    }
+    .stat-label {
+        font-size: 11px;
+        text-transform: uppercase;
+        letter-spacing: 1.5px;
+        color: #9ca3af;
+        font-weight: 600;
+    }
+
+    /* Custom Progress styling */
+    .stProgress > div > div > div > div {
+        background: linear-gradient(90deg, #3b82f6, #8b5cf6) !important;
+    }
+
+    /* Recommendation badges */
+    .badge-buy {
+        color: #4ade80 !important;
+        background: rgba(74, 222, 128, 0.1) !important;
+        border: 1px solid rgba(74, 222, 128, 0.3) !important;
+        padding: 6px 12px;
+        border-radius: 8px;
+        font-weight: 700;
+        letter-spacing: 1px;
+        font-size: 12px;
+    }
+    .badge-hold {
+        color: #facc15 !important;
+        background: rgba(250, 204, 21, 0.1) !important;
+        border: 1px solid rgba(250, 204, 21, 0.3) !important;
+        padding: 6px 12px;
+        border-radius: 8px;
+        font-weight: 700;
+        letter-spacing: 1px;
+        font-size: 12px;
+    }
+    .badge-sell {
+        color: #f87171 !important;
+        background: rgba(248, 113, 113, 0.1) !important;
+        border: 1px solid rgba(248, 113, 113, 0.3) !important;
+        padding: 6px 12px;
+        border-radius: 8px;
+        font-weight: 700;
+        letter-spacing: 1px;
+        font-size: 12px;
+    }
+
+    /* Metrics table layout */
+    .metric-row {
+        display: flex;
+        justify-content: space-between;
+        padding: 10px 0;
+        border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+    }
+    .metric-name {
+        color: #9ca3af;
+        font-size: 14px;
+    }
+    .metric-val {
+        font-family: 'JetBrains Mono', monospace;
+        font-weight: bold;
+        color: #ffffff;
+    }
+
+    /* Streamlit Expander custom styling */
+    .streamlit-expanderHeader {
+        background-color: rgba(255, 255, 255, 0.01) !important;
+        border: 1px solid rgba(255, 255, 255, 0.05) !important;
+        border-radius: 12px !important;
+        padding: 16px !important;
+        margin-bottom: 8px;
+    }
+    .streamlit-expanderContent {
+        background-color: rgba(0, 0, 0, 0.2) !important;
+        border: 1px solid rgba(255, 255, 255, 0.05) !important;
+        border-top: none !important;
+        border-bottom-left-radius: 12px !important;
+        border-bottom-right-radius: 12px !important;
+        padding: 20px !important;
+    }
+</style>
+""", unsafe_allow_html=True)
+
+# Logo & Title header
+st.markdown("""
+<div class="header-container">
+    <div class="header-logo">⚡</div>
+    <div class="header-title">StockSage</div>
+</div>
+""", unsafe_allow_html=True)
 
 # Initialize agents
 @st.cache_resource
-def initialize_agents():
-    screening_agent = ScreeningAgent()
-    fundamental_agent = FundamentalAgent()
-    sentiment_agent = SentimentAgent()
-    aggregator_agent = AggregatorAgent()
-    data_normalizer = DataNormalizer()
-    
-    return screening_agent, fundamental_agent, sentiment_agent, aggregator_agent, data_normalizer
+def get_agents():
+    return ScreeningAgent(), FundamentalAgent(), SentimentAgent(), AggregatorAgent()
 
-def main():
-    # Custom CSS for better styling and spacing
-    st.markdown("""
-    <style>
-    .main-header {
-        text-align: center;
-        padding: 3rem 1rem;
-        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-        margin: -1rem -1rem 3rem -1rem;
-        border-radius: 0 0 25px 25px;
-        box-shadow: 0 4px 20px rgba(0,0,0,0.15);
-    }
+screening_agent, fundamental_agent, sentiment_agent, aggregator_agent = get_agents()
+
+# Cached data fetches at Streamlit level to avoid redundant network requests
+@st.cache_data(ttl=600)
+def cached_fundamental_analysis(ticker):
+    return fundamental_agent.analyze_stock(ticker)
+
+@st.cache_data(ttl=1800)
+def cached_sentiment_analysis(ticker, company_name):
+    return sentiment_agent.analyze_sentiment(ticker, company_name)
+
+def process_single_ticker(t, fund_weight, sent_weight):
+    """Worker function to process a single ticker, utilizing cached agent calls."""
+    fund_data = cached_fundamental_analysis(t)
+    company = fund_data.get('company_name', t)
+    sent_data = cached_sentiment_analysis(t, company)
     
-    .main-header h1 {
-        color: white;
-        font-size: 3.5rem;
-        margin: 0;
-        text-shadow: 2px 2px 8px rgba(0,0,0,0.3);
-        font-weight: 700;
-    }
-    
-    .main-header p {
-        color: rgba(255,255,255,0.9);
-        font-size: 1.3rem;
-        margin: 1rem 0 0 0;
-        font-weight: 300;
-        letter-spacing: 0.5px;
-    }
-    
-    .section-spacing {
-        margin: 2.5rem 0;
-    }
-    
-    .process-card {
-        text-align: center;
-        padding: 2rem 1.5rem;
-        border-radius: 15px;
-        margin: 1rem 0.5rem;
-        box-shadow: 0 2px 10px rgba(0,0,0,0.1);
-        transition: transform 0.3s ease, box-shadow 0.3s ease;
-        border: 1px solid rgba(255,255,255,0.1);
-    }
-    
-    .process-card:hover {
-        transform: translateY(-5px);
-        box-shadow: 0 8px 25px rgba(0,0,0,0.15);
-    }
-    
-    .process-card h3 {
-        margin: 0 0 1rem 0;
-        font-size: 1.4rem;
-        font-weight: 600;
-    }
-    
-    .process-card p {
-        margin: 0;
-        font-size: 0.95rem;
-        line-height: 1.5;
-        opacity: 0.9;
-    }
-    
-    .weight-slider-container {
-        background: rgba(255,255,255,0.05);
-        padding: 2rem;
-        border-radius: 15px;
-        margin: 2rem 0;
-        border: 1px solid rgba(255,255,255,0.1);
-    }
-    
-    .analysis-button {
-        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%) !important;
-        color: white !important;
-        border: none !important;
-        padding: 1rem 2rem !important;
-        border-radius: 12px !important;
-        font-size: 1.1rem !important;
-        font-weight: 600 !important;
-        text-transform: uppercase !important;
-        letter-spacing: 0.5px !important;
-        box-shadow: 0 4px 15px rgba(102, 126, 234, 0.4) !important;
-        transition: all 0.3s ease !important;
-    }
-    
-    .analysis-button:hover {
-        transform: translateY(-2px) !important;
-        box-shadow: 0 8px 25px rgba(102, 126, 234, 0.6) !important;
-    }
-    
-    .metric-card {
-        padding: 1.8rem;
-        border-radius: 15px;
-        text-align: center;
-        color: white;
-        margin: 0.5rem;
-        box-shadow: 0 4px 15px rgba(0,0,0,0.2);
-        transition: transform 0.3s ease;
-    }
-    
-    .metric-card:hover {
-        transform: translateY(-3px);
-    }
-    
-    .metric-card h2 {
-        margin: 0;
-        font-size: 2.5rem;
-        font-weight: 700;
-    }
-    
-    .metric-card p {
-        margin: 0.5rem 0 0 0;
-        opacity: 0.9;
-        font-size: 1rem;
-        font-weight: 500;
-    }
-    
-    /* Dark mode improvements */
-    .stExpander > div > div > div {
-        background-color: rgba(255,255,255,0.05) !important;
-        border: 1px solid rgba(255,255,255,0.1) !important;
-        border-radius: 10px !important;
-    }
-    
-    /* Light mode text contrast improvements */
-    @media (prefers-color-scheme: light) {
-        .process-card {
-            background: white;
-            color: #2c3e50;
-            box-shadow: 0 2px 15px rgba(0,0,0,0.1);
-        }
-        
-        .process-card p {
-            color: #5a6c7d;
-        }
-        
-        .weight-slider-container {
-            background: #f8f9fa;
-            border: 1px solid #e9ecef;
-        }
-    }
-    </style>
-    """, unsafe_allow_html=True)
-    
-    # Header Section
-    st.markdown("""
-    <div class='main-header'>
-        <h1>🤖 AI Stock Advisor</h1>
-        <p>Smart insights. Simple decisions.</p>
-    </div>
-    """, unsafe_allow_html=True)
-    
-    # Initialize components
-    cache_manager = get_cache_manager()
-    screening_agent, fundamental_agent, sentiment_agent, aggregator_agent, data_normalizer = initialize_agents()
-    
-    # Step 1: Sector/Theme Selection
-    st.markdown("<div class='section-spacing'>", unsafe_allow_html=True)
-    st.markdown("### 🎯 Choose a Sector")
-    st.markdown("Select an industry that interests you for focused analysis")
-    
-    sectors = {
-        "🖥️ IT & Tech": ["TCS", "INFY", "HCLTECH", "WIPRO", "TECHM"],
-        "🏦 Banking & Finance": ["HDFCBANK", "ICICIBANK", "SBIN", "KOTAKBANK", "AXISBANK"],
-        "🚗 Auto": ["MARUTI", "TATAMOTORS", "M&M", "BAJAJ-AUTO", "EICHERMOT"],
-        "⚗️ Pharma": ["SUNPHARMA", "DRREDDY", "CIPLA", "DIVISLAB", "BIOCON"],
-        "🌿 Green Energy": ["ADANIGREEN", "SUZLON", "TATAPOWER", "NTPC", "POWERGRID"],
-        "🏭 Diversified": ["RELIANCE", "ITC", "HINDUNILVR", "LT", "ASIANPAINT"]
-    }
-    
-    selected_sector = st.selectbox(
-        "Select sector:",
-        options=list(sectors.keys()),
-        index=0,
-        help="Choose a sector that interests you for focused analysis"
+    agg = aggregator_agent.aggregate_scores(
+        ticker=t, company_name=company,
+        screening_data={'ticker': t},
+        fundamental_data=fund_data,
+        sentiment_data=sent_data,
+        fundamental_weight=fund_weight / 100,
+        sentiment_weight=sent_weight / 100,
     )
-    
-    # Show selected stocks preview
-    st.markdown(f"**Selected stocks:** {', '.join(sectors[selected_sector][:3])}...")
-    st.markdown("</div>", unsafe_allow_html=True)
-    
-    # Step 2: Sentiment vs Fundamental Weight Slider
-    st.markdown("<div class='section-spacing'>", unsafe_allow_html=True)
-    st.markdown("### ⚖️ Analysis Balance")
-    st.markdown("Customize how much weight to give each type of analysis")
-    
-    st.markdown("<div class='weight-slider-container'>", unsafe_allow_html=True)
-    
-    col1, col2, col3 = st.columns([1, 3, 1])
-    
-    with col1:
-        st.markdown("**📊 Fundamentals**")
-        st.caption("Financial health, ratios, performance metrics")
-    
-    with col2:
-        sentiment_weight = st.slider(
-            "Balance focus:",
-            min_value=0,
-            max_value=100,
-            value=50,
-            step=10,
-            format="%d%%",
-            help="Move left for fundamental focus, right for sentiment focus"
+    agg['_fund'] = fund_data
+    agg['_sent'] = sent_data
+    return agg
+
+SECTORS = {
+    "IT & Technology":      ["TCS", "INFY", "HCLTECH", "WIPRO", "TECHM"],
+    "Banking & Finance":    ["HDFCBANK", "ICICIBANK", "SBIN", "KOTAKBANK", "AXISBANK"],
+    "Automotive":           ["MARUTI", "TATAMOTORS", "M&M", "BAJAJ-AUTO", "EICHERMOT"],
+    "Pharmaceuticals":      ["SUNPHARMA", "DRREDDY", "CIPLA", "DIVISLAB", "BIOCON"],
+    "Green Energy":         ["ADANIGREEN", "SUZLON", "TATAPOWER", "NTPC", "POWERGRID"],
+    "Diversified":          ["RELIANCE", "ITC", "HINDUNILVR", "LT", "ASIANPAINT"],
+}
+
+# Layout with two columns: Sidebar panel (Left) and Results area (Right)
+left_panel, right_panel = st.columns([1, 2.5], gap="large")
+
+with left_panel:
+    with st.form("parameters_form", clear_on_submit=False):
+        st.subheader("Analysis Parameters")
+        
+        mode = st.radio(
+            "Analysis Mode",
+            options=["Sector Basket", "Custom"],
+            horizontal=True
         )
         
-        # Visual representation with better styling
-        fundamental_weight = 100 - sentiment_weight
+        if mode == "Sector Basket":
+            sector = st.selectbox("Sector", list(SECTORS.keys()))
+            tickers_input = ""
+        else:
+            sector = ""
+            tickers_input = st.text_input("Tickers (Comma separated)", placeholder="AAPL, TSLA, MSFT")
+            
+        num_stocks = st.slider("Max Stocks to Analyze", min_value=1, max_value=5, value=5)
+        
+        fund_weight = st.slider("Fundamental Weight (%)", min_value=0, max_value=100, value=60, step=10)
+        sent_weight = 100 - fund_weight
+        st.caption(f"Weighting: **{fund_weight}%** Fundamental / **{sent_weight}%** Sentiment")
+        
+        run_btn = st.form_submit_button("⚡ Run Analysis", use_container_width=True)
+
+with right_panel:
+    # State tracking for analysis results
+    if 'analysis_results' not in st.session_state:
+        st.session_state.analysis_results = None
+
+    if run_btn:
+        # Resolve tickers
+        if mode == "Sector Basket":
+            tickers = SECTORS.get(sector, [])[:num_stocks]
+        else:
+            tickers = [t.strip().upper() for t in tickers_input.split(',') if t.strip()][:num_stocks]
+            
+        if not tickers:
+            st.error("Please enter or select at least one valid ticker symbol.")
+        else:
+            # Set up loading block
+            progress_bar = st.progress(0)
+            status_text = st.empty()
+            
+            status_text.markdown("**Status**: Fetching stock data & scraping news concurrently...")
+            progress_bar.progress(15)
+            
+            results = []
+            errors = []
+            
+            import concurrent.futures
+            
+            # Fetch tickers concurrently
+            total_tickers = len(tickers)
+            completed_tickers = 0
+            
+            with concurrent.futures.ThreadPoolExecutor(max_workers=total_tickers) as executor:
+                # Submit workers
+                future_to_ticker = {
+                    executor.submit(process_single_ticker, t, fund_weight, sent_weight): t 
+                    for t in tickers
+                }
+                
+                for future in concurrent.futures.as_completed(future_to_ticker):
+                    t = future_to_ticker[future]
+                    completed_tickers += 1
+                    pct = 10 + int((completed_tickers / total_tickers) * 90)
+                    progress_bar.progress(min(pct, 100))
+                    status_text.markdown(f"**Status**: Completed analysis for **{t}** ({completed_tickers}/{total_tickers})...")
+                    
+                    try:
+                        data = future.result()
+                        if 'error' in data and not data.get('overall_score'):
+                            errors.append((t, data['error']))
+                        else:
+                            results.append(data)
+                    except Exception as e:
+                        errors.append((t, str(e)))
+            
+            for t, err in errors:
+                st.warning(f"Failed to analyze {t}: {err}")
+                
+            results.sort(key=lambda x: x.get('overall_score', 0), reverse=True)
+            st.session_state.analysis_results = results
+            
+            progress_bar.progress(100)
+            status_text.markdown("**Status**: Analysis complete.")
+            time.sleep(0.3)
+            progress_bar.empty()
+            status_text.empty()
+
+    # Render results or Hero
+    results = st.session_state.analysis_results
+    
+    if results is None:
+        # Hero view
+        st.markdown("""
+        <div style="margin-top: 50px;">
+            <h1 class="hero-title">Invest with <br/><span class="hero-gradient">AI Precision.</span></h1>
+            <p class="hero-subtitle">Experience the next generation of financial analysis. We merge deep fundamental data with real-time global news sentiment into a single, intuitive dashboard.</p>
+        </div>
+        """, unsafe_allow_html=True)
+    else:
+        # Results overview container
+        avg_score = sum(r['overall_score'] for r in results) / len(results) if results else 0
+        buys = sum(1 for r in results if r['recommendation'] == 'BUY')
+        holds = sum(1 for r in results if r['recommendation'] == 'HOLD')
+        sells = sum(1 for r in results if r['recommendation'] == 'SELL')
         
         st.markdown(f"""
-        <div style='display: flex; height: 30px; margin: 15px 0; border-radius: 15px; overflow: hidden; box-shadow: 0 2px 10px rgba(0,0,0,0.1);'>
-            <div style='background: linear-gradient(135deg, #4CAF50, #45a049); width: {fundamental_weight}%; display: flex; align-items: center; justify-content: center; color: white; font-size: 14px; font-weight: 600;'>
-                📊 {fundamental_weight}%
+        <div class="stat-container">
+            <div class="stat-card">
+                <div class="stat-value">{avg_score:.1f}</div>
+                <div class="stat-label">Avg Score</div>
             </div>
-            <div style='background: linear-gradient(135deg, #2196F3, #1976d2); width: {sentiment_weight}%; display: flex; align-items: center; justify-content: center; color: white; font-size: 14px; font-weight: 600;'>
-                🗞️ {sentiment_weight}%
+            <div class="stat-card">
+                <div class="stat-value" style="color: #4ade80;">{buys}</div>
+                <div class="stat-label">Buy Signals</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-value" style="color: #facc15;">{holds}</div>
+                <div class="stat-label">Hold Signals</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-value" style="color: #f87171;">{sells}</div>
+                <div class="stat-label">Sell Signals</div>
             </div>
         </div>
         """, unsafe_allow_html=True)
-    
-    with col3:
-        st.markdown("**🗞️ Sentiment**")
-        st.caption("News analysis, market sentiment, buzz")
-    
-    st.markdown("</div>", unsafe_allow_html=True)
-    st.markdown("</div>", unsafe_allow_html=True)
-    
-    # Step 3: Advanced Options (collapsible)
-    st.markdown("<div class='section-spacing'>", unsafe_allow_html=True)
-    with st.expander("🔧 Advanced Options", expanded=False):
-        st.markdown("**Fine-tune your analysis parameters**")
         
-        col1, col2 = st.columns(2)
-        with col1:
-            num_stocks = st.selectbox(
-                "Number of stocks to analyze:",
-                options=[3, 5, 8, 10],
-                index=1,
-                help="More stocks = longer analysis time"
-            )
-        
-        with col2:
-            risk_tolerance = st.selectbox(
-                "Risk Tolerance:",
-                options=["Conservative", "Moderate", "Aggressive"],
-                index=1,
-                help="Adjusts recommendation thresholds"
-            )
-    st.markdown("</div>", unsafe_allow_html=True)
-    
-    # Step 4: Analyze Button
-    st.markdown("<div class='section-spacing'>", unsafe_allow_html=True)
-    
-    col1, col2, col3 = st.columns([1, 2, 1])
-    with col2:
-        analyze_button = st.button(
-            "🔍 Run Analysis", 
-            type="primary", 
-            use_container_width=True,
-            help="Start analyzing selected sector stocks"
-        )
-    
-    st.markdown("</div>", unsafe_allow_html=True)
-    
-    # Main content area
-    if analyze_button:
-        with st.spinner("🔍 Multi-Agent Analysis in Progress..."):
-            try:
-                # Progress tracking
-                progress_bar = st.progress(0)
-                status_text = st.empty()
-                
-                # Step 1: Use sector-based stocks instead of scraping
-                status_text.text("🎯 Preparing sector stocks for analysis...")
-                progress_bar.progress(10)
-                
-                # Get stocks from selected sector
-                sector_stocks = sectors[selected_sector][:num_stocks]
-                screening_results = []
-                
-                for ticker in sector_stocks:
-                    screening_results.append({
-                        'ticker': ticker,
-                        'name': f"{ticker} Limited",  # Simplified for demo
-                        'sector': selected_sector,
-                        'source': 'sector_selection'
-                    })
-                
-                if not screening_results:
-                    st.error("❌ No stocks found for selected sector")
-                    return
-                
-                st.success(f"✅ Analyzing {len(screening_results)} stocks from {selected_sector}")
-                progress_bar.progress(25)
-                
-                # Step 2: Fundamental Analysis Agent
-                status_text.text("📊 Fundamental Agent: Analyzing financial metrics...")
-                
-                fundamental_data = {}
-                for i, stock in enumerate(screening_results):
-                    ticker = stock['ticker']
-                    fundamental_data[ticker] = fundamental_agent.analyze_stock(ticker)
-                    progress_bar.progress(25 + (i + 1) * 25 // len(screening_results))
-                
-                progress_bar.progress(50)
-                
-                # Step 3: Sentiment Analysis Agent
-                status_text.text("📰 Sentiment Agent: Analyzing market sentiment...")
-                
-                sentiment_data = {}
-                for i, stock in enumerate(screening_results):
-                    ticker = stock['ticker']
-                    company_name = stock['name']
-                    sentiment_data[ticker] = sentiment_agent.analyze_sentiment(ticker, company_name)
-                    progress_bar.progress(50 + (i + 1) * 25 // len(screening_results))
-                
-                progress_bar.progress(75)
-                
-                # Step 4: Aggregator Agent
-                status_text.text("🔧 Aggregator Agent: Combining analysis results...")
-                
-                final_results = []
-                for stock in screening_results:
-                    ticker = stock['ticker']
-                    
-                    # Get normalized scores
-                    fundamental_score = data_normalizer.normalize_fundamental_score(
-                        fundamental_data.get(ticker, {})
-                    )
-                    sentiment_score = data_normalizer.normalize_sentiment_score(
-                        sentiment_data.get(ticker, {})
-                    )
-                    
-                    # Aggregate scores
-                    aggregated_result = aggregator_agent.aggregate_scores(
-                        ticker=ticker,
-                        company_name=stock['name'],
-                        screening_data=stock,
-                        fundamental_data=fundamental_data.get(ticker, {}),
-                        sentiment_data=sentiment_data.get(ticker, {}),
-                        fundamental_weight=fundamental_weight / 100,
-                        sentiment_weight=sentiment_weight / 100
-                    )
-                    
-                    final_results.append(aggregated_result)
-                
-                progress_bar.progress(100)
-                status_text.text("✨ Analysis Complete!")
-                
-                # Clear progress indicators
-                time.sleep(1)
-                progress_bar.empty()
-                status_text.empty()
-                
-                # Display results
-                display_results(final_results, fundamental_weight, sentiment_weight)
-                
-            except Exception as e:
-                st.error(f"❌ Analysis failed: {str(e)}")
-                st.exception(e)
-    
-    else:
-        # Modern welcome screen
-        st.markdown("---")
-        
-        # How it works section
-        st.markdown("## 🎯 How It Works")
-        
-        col1, col2, col3, col4 = st.columns(4)
-        
-        with col1:
-            st.markdown("""
-            <div class='process-card' style='background: linear-gradient(135deg, #e3f2fd, #bbdefb);'>
-                <h3 style='color: #1976d2;'>🎯 Select</h3>
-                <p style='color: #424242;'>Choose your preferred sector from IT, Banking, Auto, Pharma, and more</p>
-            </div>
-            """, unsafe_allow_html=True)
-        
-        with col2:
-            st.markdown("""
-            <div class='process-card' style='background: linear-gradient(135deg, #f3e5f5, #e1bee7);'>
-                <h3 style='color: #7b1fa2;'>⚖️ Balance</h3>
-                <p style='color: #424242;'>Adjust focus between fundamental analysis and sentiment analysis</p>
-            </div>
-            """, unsafe_allow_html=True)
-        
-        with col3:
-            st.markdown("""
-            <div class='process-card' style='background: linear-gradient(135deg, #e8f5e8, #c8e6c9);'>
-                <h3 style='color: #388e3c;'>🔍 Analyze</h3>
-                <p style='color: #424242;'>AI agents analyze fundamentals, news sentiment, and market data</p>
-            </div>
-            """, unsafe_allow_html=True)
-        
-        with col4:
-            st.markdown("""
-            <div class='process-card' style='background: linear-gradient(135deg, #fff3e0, #ffcc02);'>
-                <h3 style='color: #f57c00;'>📊 Decide</h3>
-                <p style='color: #424242;'>Get BUY/HOLD/SELL recommendations with detailed reasoning</p>
-            </div>
-            """, unsafe_allow_html=True)
-        
-        st.markdown("<br>", unsafe_allow_html=True)
-        
-        # Agent details in collapsible sections
-        with st.expander("🤖 Meet the AI Agents", expanded=False):
-            agent_col1, agent_col2 = st.columns(2)
+        # Render Stock Cards
+        for idx, result in enumerate(results):
+            ticker = result['ticker']
+            company_name = result['company_name']
+            overall_score = result['overall_score']
+            rec = result['recommendation']
             
-            with agent_col1:
-                st.markdown("""
-                **📊 Fundamental Analysis Agent**
-                - Fetches live data using yfinance
-                - Analyzes PE ratio, PB ratio, ROE, debt levels
-                - Evaluates financial health and growth metrics
-                
-                **🔧 Aggregator Agent**
-                - Combines all analysis into single score
-                - Generates BUY/HOLD/SELL recommendations
-                - Provides human-readable reasoning
-                """)
+            # Badge selection
+            badge_class = "badge-buy" if rec == 'BUY' else "badge-hold" if rec == 'HOLD' else "badge-sell"
             
-            with agent_col2:
-                st.markdown("""
-                **📰 Sentiment Analysis Agent**
-                - Fetches latest news via NewsAPI
-                - Uses NLTK VADER sentiment analysis
-                - Applies spaCy NLP for entity recognition
-                
-                **🎯 Sector Intelligence**
-                - Curated stock lists by industry
-                - Context-aware analysis for each sector
-                - Focused recommendations within themes
-                """)
-        
-        # Sample preview
-        st.markdown("### 📈 Sample Analysis Preview")
-        
-        # Mock sample card for demonstration
-        with st.container():
-            st.markdown("""
-            <div style='border: 2px dashed #ccc; padding: 20px; border-radius: 10px; background: #f9f9f9;'>
-                <div style='display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px;'>
-                    <h4 style='margin: 0; color: #333;'>📊 Sample: TCS - Tata Consultancy Services</h4>
-                    <span style='background: #4CAF50; color: white; padding: 5px 15px; border-radius: 20px; font-weight: bold;'>✅ BUY</span>
-                </div>
-                <p style='color: #666; margin: 0 0 10px 0;'><strong>Score:</strong> 78.5/100 | <strong>PE:</strong> 22.4 | <strong>Sentiment:</strong> Positive</p>
-                <p style='color: #555; margin: 0; font-style: italic;'>Strong fundamentals with positive market sentiment and excellent returns on equity</p>
-            </div>
-            """, unsafe_allow_html=True)
-        
-        # Call to action
-        st.markdown("### 🚀 Ready to Start?")
-        st.markdown("1. **Choose a sector** that interests you")
-        st.markdown("2. **Adjust the analysis balance** based on your preference")
-        st.markdown("3. **Click 'Run Analysis'** to get AI-powered recommendations")
-        
-        # Quick stats
-        info_col1, info_col2 = st.columns(2)
-        
-        with info_col1:
-            st.info("""
-            **⚡ Fast & Accurate**
-            - Analysis completed in 30-60 seconds
-            - Real-time data from yfinance
-            - Smart caching for better performance
-            """)
-        
-        with info_col2:
-            st.success("""
-            **🔒 Reliable Sources**
-            - Live financial data
-            - Latest news sentiment
-            - No mock or placeholder data
-            """)
-
-def display_results(results, fundamental_weight, sentiment_weight):
-    """Display comprehensive analysis results with modern card-based interface"""
-    
-    # Sort by overall score
-    results_sorted = sorted(results, key=lambda x: x['overall_score'], reverse=True)
-    
-    # Header with performance chart
-    st.markdown("<div class='section-spacing'>", unsafe_allow_html=True)
-    st.markdown("## 🧾 Stock Analysis Results")
-    st.markdown("Here are your personalized stock recommendations based on AI analysis")
-    
-    # Summary metrics with improved styling
-    col1, col2, col3, col4 = st.columns(4)
-    
-    buy_count = len([r for r in results_sorted if r['recommendation'] == 'BUY'])
-    hold_count = len([r for r in results_sorted if r['recommendation'] == 'HOLD'])
-    sell_count = len([r for r in results_sorted if r['recommendation'] == 'SELL'])
-    avg_score = np.mean([r['overall_score'] for r in results_sorted])
-    
-    with col1:
-        st.markdown("""
-        <div class='metric-card' style='background: linear-gradient(135deg, #4CAF50, #45a049);'>
-            <h2>✅ {}</h2>
-            <p>BUY Recommendations</p>
-        </div>
-        """.format(buy_count), unsafe_allow_html=True)
-    
-    with col2:
-        st.markdown("""
-        <div class='metric-card' style='background: linear-gradient(135deg, #FF9800, #f57c00);'>
-            <h2>⚠️ {}</h2>
-            <p>HOLD Recommendations</p>
-        </div>
-        """.format(hold_count), unsafe_allow_html=True)
-    
-    with col3:
-        st.markdown("""
-        <div class='metric-card' style='background: linear-gradient(135deg, #f44336, #d32f2f);'>
-            <h2>❌ {}</h2>
-            <p>SELL Recommendations</p>
-        </div>
-        """.format(sell_count), unsafe_allow_html=True)
-    
-    with col4:
-        st.markdown("""
-        <div class='metric-card' style='background: linear-gradient(135deg, #2196F3, #1976d2);'>
-            <h2>{:.1f}</h2>
-            <p>Average Score</p>
-        </div>
-        """.format(avg_score), unsafe_allow_html=True)
-    
-    st.markdown("</div>", unsafe_allow_html=True)
-    
-    # Performance chart
-    if len(results_sorted) > 1:
-        fig = go.Figure()
-        
-        colors = ['#4CAF50' if r['recommendation'] == 'BUY' 
-                 else '#FF9800' if r['recommendation'] == 'HOLD' 
-                 else '#f44336' for r in results_sorted]
-        
-        fig.add_trace(go.Bar(
-            x=[r['ticker'] for r in results_sorted],
-            y=[r['overall_score'] for r in results_sorted],
-            marker_color=colors,
-            text=[f"{r['overall_score']:.1f}" for r in results_sorted],
-            textposition='auto',
-        ))
-        
-        fig.update_layout(
-            title="📊 Stock Performance Comparison",
-            xaxis_title="Stock Ticker",
-            yaxis_title="Overall Score",
-            showlegend=False,
-            height=400,
-            plot_bgcolor='rgba(0,0,0,0)',
-            paper_bgcolor='rgba(0,0,0,0)',
-        )
-        
-        st.plotly_chart(fig, use_container_width=True)
-    
-    # Stock cards with expandable details
-    st.markdown("<div class='section-spacing'>", unsafe_allow_html=True)
-    st.markdown("### 📋 Detailed Stock Analysis")
-    st.markdown("Click each stock to see full analysis details")
-    
-    for i, result in enumerate(results_sorted):
-        # Recommendation badge styling
-        if result['recommendation'] == 'BUY':
-            badge_color = '#4CAF50'
-            badge_bg = 'linear-gradient(135deg, #4CAF50, #45a049)'
-            badge_emoji = '✅'
-        elif result['recommendation'] == 'HOLD':
-            badge_color = '#FF9800'
-            badge_bg = 'linear-gradient(135deg, #FF9800, #f57c00)'
-            badge_emoji = '⚠️'
-        else:
-            badge_color = '#f44336'
-            badge_bg = 'linear-gradient(135deg, #f44336, #d32f2f)'
-            badge_emoji = '❌'
-        
-        # Create expandable card with improved styling
-        with st.expander(f"#{i+1} {result['ticker']} - {result['company_name']}", expanded=(i==0)):
+            card_title = f"{ticker} — {company_name}"
             
-            # Enhanced summary view with better contrast
-            st.markdown(f"""
-            <div style='background: {badge_bg}; color: white; padding: 20px; border-radius: 12px; margin-bottom: 20px; box-shadow: 0 4px 15px rgba(0,0,0,0.2);'>
-                <div style='display: flex; justify-content: space-between; align-items: center;'>
+            with st.expander(f"💼 {card_title}", expanded=(idx == 0)):
+                # Header info row inside expander
+                st.markdown(f"""
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; padding-bottom: 10px; border-bottom: 1px solid rgba(255,255,255,0.1);">
                     <div>
-                        <h2 style='margin: 0; font-size: 1.8rem; font-weight: 700;'>{badge_emoji} {result['recommendation']}</h2>
-                        <p style='margin: 8px 0 0 0; opacity: 0.9; font-size: 1.1rem;'>Overall Score: {result['overall_score']:.1f}/100</p>
+                        <span class="{badge_class}">{rec}</span>
                     </div>
-                    <div style='text-align: right;'>
-                        <p style='margin: 0; font-size: 1rem; opacity: 0.8;'>Confidence: High</p>
+                    <div style="text-align: right;">
+                        <span style="color: #9ca3af; font-size: 13px;">OVERALL SCORE</span>
+                        <h3 style="margin: 0; font-size: 24px; font-weight: bold;">{overall_score:.1f}</h3>
                     </div>
-                </div>
-            </div>
-            """, unsafe_allow_html=True)
-            
-            # Analysis breakdown with improved readability
-            col1, col2, col3 = st.columns(3)
-            
-            with col1:
-                st.markdown("#### ⚖️ Analysis Balance")
-                fund_pct = fundamental_weight
-                sent_pct = sentiment_weight
-                
-                st.markdown(f"""
-                <div style='background: rgba(255,255,255,0.1); padding: 15px; border-radius: 10px; margin: 10px 0;'>
-                    <div style='display: flex; height: 25px; border-radius: 12px; overflow: hidden; margin: 10px 0;'>
-                        <div style='background: linear-gradient(135deg, #4CAF50, #45a049); width: {fund_pct}%; display: flex; align-items: center; justify-content: center; color: white; font-size: 12px; font-weight: 600;'>
-                            📊 {fund_pct}%
-                        </div>
-                        <div style='background: linear-gradient(135deg, #2196F3, #1976d2); width: {sent_pct}%; display: flex; align-items: center; justify-content: center; color: white; font-size: 12px; font-weight: 600;'>
-                            🗞️ {sent_pct}%
-                        </div>
-                    </div>
-                    <p style='margin: 5px 0 0 0; font-size: 0.9rem; opacity: 0.8;'>Fundamentals vs Sentiment</p>
                 </div>
                 """, unsafe_allow_html=True)
-            
-            with col2:
-                st.markdown("#### 📊 Fundamental Score")
-                fund_score = result.get('fundamental_score', 50)
-                fund_color = '#4CAF50' if fund_score >= 70 else '#FF9800' if fund_score >= 50 else '#f44336'
                 
-                st.markdown(f"""
-                <div style='background: rgba(255,255,255,0.1); padding: 15px; border-radius: 10px; margin: 10px 0; text-align: center;'>
-                    <h3 style='margin: 0; color: {fund_color}; font-size: 2rem;'>{fund_score:.1f}</h3>
-                    <p style='margin: 5px 0 0 0; font-size: 0.9rem; opacity: 0.8;'>Financial Health</p>
-                </div>
-                """, unsafe_allow_html=True)
-            
-            with col3:
-                st.markdown("#### 🗞️ Sentiment Score")
-                sent_score = result.get('sentiment_score', 50)
-                sent_color = '#4CAF50' if sent_score >= 70 else '#FF9800' if sent_score >= 50 else '#f44336'
+                exp_col1, exp_col2 = st.columns([1.1, 0.9], gap="medium")
                 
-                st.markdown(f"""
-                <div style='background: rgba(255,255,255,0.1); padding: 15px; border-radius: 10px; margin: 10px 0; text-align: center;'>
-                    <h3 style='margin: 0; color: {sent_color}; font-size: 2rem;'>{sent_score:.1f}</h3>
-                    <p style='margin: 5px 0 0 0; font-size: 0.9rem; opacity: 0.8;'>Market Sentiment</p>
-                </div>
-                """, unsafe_allow_html=True)
-            
-            # Summary reasoning with better formatting
-            st.markdown("#### 💡 AI Analysis Summary")
-            reasoning = result.get('reasoning', 'Analysis completed successfully')
-            st.markdown(f"""
-            <div style='background: rgba(255,255,255,0.05); padding: 20px; border-radius: 10px; border-left: 4px solid {badge_color}; margin: 15px 0;'>
-                <p style='margin: 0; font-size: 1rem; line-height: 1.6; color: var(--text-color);'>{reasoning}</p>
-            </div>
-            """, unsafe_allow_html=True)
-            
-            # Detailed metrics in organized sections
-            st.markdown("---")
-            detail_col1, detail_col2 = st.columns(2)
-            
-            with detail_col1:
-                st.markdown("#### 📊 Financial Metrics")
+                # Fetch details
+                f = result.get('_fund', {})
+                s = result.get('_sent', {})
                 
-                metrics = [
-                    ("PE Ratio", result.get('pe_ratio', 'N/A')),
-                    ("PB Ratio", result.get('pb_ratio', 'N/A')), 
-                    ("ROE", result.get('roe', 'N/A')),
-                    ("Market Cap", result.get('market_cap', 'N/A')),
-                    ("Current Price", f"₹{result.get('current_price', 'N/A')}")
-                ]
-                
-                for label, value in metrics:
-                    if value != 'N/A' and value is not None:
-                        if isinstance(value, float) and abs(value) < 1:
-                            value = f"{value:.3f}"
-                        elif isinstance(value, float):
-                            value = f"{value:.2f}"
+                with exp_col1:
+                    st.markdown("#### Financials & Indicators")
+                    
+                    price_val = f.get('current_price', 'N/A')
+                    curr = f.get('currency', '')
+                    price_str = f"{curr} {price_val}" if price_val != 'N/A' else 'N/A'
+                    
+                    pe_val = f.get('pe_ratio')
+                    pe_str = f"{pe_val:.2f}" if pe_val is not None else 'N/A'
+                    
+                    roe_val = f.get('roe')
+                    roe_str = f"{roe_val * 100:.1f}%" if roe_val is not None else 'N/A'
+                    
+                    de_val = f.get('debt_to_equity')
+                    de_str = f"{de_val:.2f}" if de_val is not None else 'N/A'
                     
                     st.markdown(f"""
-                    <div style='display: flex; justify-content: space-between; padding: 8px 0; border-bottom: 1px solid rgba(255,255,255,0.1);'>
-                        <span style='font-weight: 600;'>{label}:</span>
-                        <span style='color: var(--text-color);'>{value}</span>
-                    </div>
+                    <div class="metric-row"><span class="metric-name">Current Price</span><span class="metric-val">{price_str}</span></div>
+                    <div class="metric-row"><span class="metric-name">P/E Ratio</span><span class="metric-val">{pe_str}</span></div>
+                    <div class="metric-row"><span class="metric-name">Return on Equity (ROE)</span><span class="metric-val">{roe_str}</span></div>
+                    <div class="metric-row"><span class="metric-name">Debt to Equity</span><span class="metric-val">{de_str}</span></div>
                     """, unsafe_allow_html=True)
-            
-            with detail_col2:
-                st.markdown("#### 📰 News Analysis")
-                
-                sentiment_metrics = [
-                    ("Sentiment Score", f"{result.get('avg_sentiment', 'N/A')}"),
-                    ("Positive News", f"{result.get('positive_count', 0)} articles"),
-                    ("Negative News", f"{result.get('negative_count', 0)} articles"),
-                    ("Total Coverage", f"{result.get('total_articles', 0)} articles"),
-                    ("News Quality", "Real-time data")
-                ]
-                
-                for label, value in sentiment_metrics:
+                    
+                    st.markdown("<br/>", unsafe_allow_html=True)
+                    
+                    reasoning_text = result.get('reasoning', 'No reasoning analysis available.')
                     st.markdown(f"""
-                    <div style='display: flex; justify-content: space-between; padding: 8px 0; border-bottom: 1px solid rgba(255,255,255,0.1);'>
-                        <span style='font-weight: 600;'>{label}:</span>
-                        <span style='color: var(--text-color);'>{value}</span>
+                    <div style="padding: 16px; border-radius: 12px; background: rgba(59, 130, 246, 0.08); border: 1px solid rgba(59, 130, 246, 0.2); color: #bfdbfe; font-size: 14px; line-height: 1.5;">
+                        ℹ️ <b>Analysis Summary:</b> {reasoning_text}
                     </div>
                     """, unsafe_allow_html=True)
-    
-    st.markdown("</div>", unsafe_allow_html=True)
-    
-    # Action buttons
-    st.markdown("---")
-    col1, col2, col3 = st.columns(3)
-    
-    with col1:
-        # Download CSV
-        df_export = pd.DataFrame([{
-            'Rank': i+1,
-            'Ticker': r['ticker'],
-            'Company': r['company_name'],
-            'Recommendation': r['recommendation'],
-            'Score': r['overall_score'],
-            'PE_Ratio': r.get('pe_ratio', 'N/A'),
-            'Sentiment': r.get('avg_sentiment', 'N/A')
-        } for i, r in enumerate(results_sorted)])
-        
-        csv = df_export.to_csv(index=False)
-        st.download_button(
-            "📥 Download CSV",
-            data=csv,
-            file_name=f"stock_analysis_{datetime.now().strftime('%Y%m%d_%H%M%S')}.csv",
-            mime="text/csv",
-            use_container_width=True
-        )
-    
-    with col2:
-        if st.button("🔄 Refresh Analysis", use_container_width=True):
-            st.rerun()
-    
-    with col3:
-        st.button("📊 View Portfolio", use_container_width=True, help="Coming soon")
-
-if __name__ == "__main__":
-    main()
+                
+                with exp_col2:
+                    st.markdown("#### Analysis Radar")
+                    
+                    # Calculate values to match Radar Chart
+                    pe_score = min(100, max(0, 100 - ((pe_val or 15) - 10) * 2))
+                    roe_score = min(100, (roe_val or 0) * 400)
+                    debt_score = min(100, 100 - (de_val or 0) * 20)
+                    sentiment_score = result.get('sentiment_score', 50)
+                    fundamental_score = result.get('fundamental_score', 50)
+                    
+                    categories = ['Valuation', 'Profitability', 'Health', 'Sentiment', 'Fundamentals']
+                    values = [pe_score, roe_score, debt_score, sentiment_score, fundamental_score]
+                    
+                    # Create Plotly Radar Chart matching Recharts style
+                    fig = go.Figure()
+                    fig.add_trace(go.Scatterpolar(
+                        r=values + [values[0]],
+                        theta=categories + [categories[0]],
+                        fill='toself',
+                        fillcolor='rgba(59, 130, 246, 0.2)',
+                        line=dict(color='#3b82f6', width=2),
+                        name='Scores'
+                    ))
+                    
+                    fig.update_layout(
+                        polar=dict(
+                            bgcolor='rgba(0,0,0,0)',
+                            radialaxis=dict(
+                                visible=True,
+                                range=[0, 100],
+                                color='#4b5563',
+                                showticklabels=False,
+                                gridcolor='rgba(255,255,255,0.06)'
+                            ),
+                            angularaxis=dict(
+                                color='#9ca3af',
+                                gridcolor='rgba(255,255,255,0.06)',
+                                tickfont=dict(family='Outfit', size=10)
+                            )
+                        ),
+                        showlegend=False,
+                        paper_bgcolor='rgba(0,0,0,0)',
+                        plot_bgcolor='rgba(0,0,0,0)',
+                        margin=dict(l=35, r=35, t=35, b=35),
+                        height=310
+                    )
+                    
+                    st.plotly_chart(fig, use_container_width=True, config={'displayModeBar': False})
+                    
+                st.markdown("<hr style='margin: 15px 0; border-color: rgba(255,255,255,0.05);'/>", unsafe_allow_html=True)
+                
+                # Render news articles
+                detailed_news = s.get('detailed_analysis', [])
+                if detailed_news:
+                    with st.expander("📰 Referenced News Articles"):
+                        for a in detailed_news[:6]:  # show top 6 news
+                            title = a.get('title', 'No title available')
+                            score = a.get('sentiment_score', 0.0)
+                            label = a.get('sentiment_label', 'neutral')
+                            source = a.get('source', 'Unknown')
+                            url = a.get('url', '#')
+                            published = a.get('published_at', '')
+                            
+                            # Badge formatting
+                            color = "#4ade80" if label == "positive" else "#f87171" if label == "negative" else "#9ca3af"
+                            bg_color = "rgba(74, 222, 128, 0.1)" if label == "positive" else "rgba(248, 113, 113, 0.1)" if label == "negative" else "rgba(156, 163, 175, 0.1)"
+                            border = "1px solid rgba(74, 222, 128, 0.3)" if label == "positive" else "1px solid rgba(248, 113, 113, 0.3)" if label == "negative" else "1px solid rgba(156, 163, 175, 0.3)"
+                            
+                            st.markdown(f"""
+                            <div style="padding: 12px; margin-bottom: 10px; background: rgba(255, 255, 255, 0.01); border: 1px solid rgba(255, 255, 255, 0.04); border-radius: 8px; display: flex; justify-content: space-between; align-items: center; gap: 15px;">
+                                <div style="flex-grow: 1;">
+                                    <a href="{url}" target="_blank" style="color: #60a5fa; text-decoration: none; font-weight: 600; font-size: 14px; hover: text-decoration: underline;">{title}</a>
+                                    <div style="color: #9ca3af; font-size: 11px; margin-top: 4px;">Source: {source} | Date: {published}</div>
+                                </div>
+                                <div style="text-align: right; min-width: 120px;">
+                                    <span style="color: {color}; background: {bg_color}; border: {border}; padding: 4px 8px; border-radius: 6px; font-size: 10px; font-weight: 700; letter-spacing: 0.5px; text-transform: uppercase;">
+                                        {label} ({score:.2f})
+                                    </span>
+                                </div>
+                            </div>
+                            """, unsafe_allow_html=True)
+                else:
+                    st.info("No referenced news articles found for this ticker.")

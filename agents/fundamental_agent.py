@@ -21,19 +21,32 @@ class FundamentalAgent:
             Dictionary containing fundamental metrics
         """
         try:
-            # Add .NS suffix for Indian stocks if not present
-            yf_ticker = ticker if '.NS' in ticker else f"{ticker}.NS"
-            
-            # Check cache first
-            cache_key = f"fundamental_{yf_ticker}"
-            if self._is_cached(cache_key):
-                return self.cache[cache_key]['data']
-            
-            # Fetch stock data
-            stock = yf.Ticker(yf_ticker)
-            
-            # Get basic info
-            info = stock.info
+            # Check cache first (either as-is or with .NS)
+            cache_key_as_is = f"fundamental_{ticker}"
+            if self._is_cached(cache_key_as_is):
+                return self.cache[cache_key_as_is]['data']
+                
+            cache_key_ns = f"fundamental_{ticker}.NS"
+            if self._is_cached(cache_key_ns):
+                return self.cache[cache_key_ns]['data']
+
+            # Resolve correct yfinance ticker (default to NSE suffix for Indian stocks if as-is query lacks details)
+            yf_ticker = ticker
+            if '.' not in ticker:
+                try:
+                    stock = yf.Ticker(ticker)
+                    info = stock.info
+                    if not info or not info.get('regularMarketPrice') or not info.get('longName'):
+                        yf_ticker = f"{ticker}.NS"
+                        stock = yf.Ticker(yf_ticker)
+                        info = stock.info
+                except:
+                    yf_ticker = f"{ticker}.NS"
+                    stock = yf.Ticker(yf_ticker)
+                    info = stock.info
+            else:
+                stock = yf.Ticker(yf_ticker)
+                info = stock.info
             
             # Get financial data
             financials = self._get_safe_financials(stock)
@@ -95,7 +108,7 @@ class FundamentalAgent:
             }
             
             # Cache the results
-            self._cache_data(cache_key, fundamental_data)
+            self._cache_data(f"fundamental_{yf_ticker}", fundamental_data)
             
             return fundamental_data
             

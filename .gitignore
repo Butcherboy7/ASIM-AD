@@ -137,3 +137,5 @@ replit.nix
 poetry.lock
 pyproject.toml
 uv.lock
+# Frontend cache & node_modules
+frontend/

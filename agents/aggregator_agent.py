@@ -272,67 +272,71 @@ class AggregatorAgent:
     ) -> str:
         """Generate human-readable reasoning for the recommendation"""
         try:
-            reasoning_parts = []
+            ticker = fundamental_data.get('ticker', 'the stock')
+            company_name = fundamental_data.get('company_name', ticker)
             
-            # Overall assessment
-            if overall_score >= 80:
-                reasoning_parts.append("Strong overall performance")
-            elif overall_score >= 60:
-                reasoning_parts.append("Good overall performance")
+            # 1. Overall assessment
+            if overall_score >= 75:
+                verdict = f"{company_name} ({ticker}) exhibits a highly attractive risk-reward profile with an overall rating of {overall_score:.1f}/100."
+            elif overall_score >= 55:
+                verdict = f"Our model rates {company_name} ({ticker}) as moderately favorable at {overall_score:.1f}/100, showing steady performance indicators."
             elif overall_score >= 40:
-                reasoning_parts.append("Mixed performance signals")
+                verdict = f"Analysis yields a neutral outlook for {company_name} ({ticker}) at {overall_score:.1f}/100, due to conflicting fundamental and sentiment trends."
             else:
-                reasoning_parts.append("Weak overall performance")
-            
-            # Fundamental analysis reasoning
-            if fundamental_score >= 70:
-                reasoning_parts.append("strong fundamentals")
-            elif fundamental_score >= 50:
-                reasoning_parts.append("decent fundamentals")
-            else:
-                reasoning_parts.append("weak fundamentals")
-            
-            # Add specific fundamental insights
-            pe_ratio = fundamental_data.get('pe_ratio')
-            if pe_ratio and pe_ratio < 15:
-                reasoning_parts.append("attractive valuation")
-            elif pe_ratio and pe_ratio > 30:
-                reasoning_parts.append("high valuation")
-            
-            roe = fundamental_data.get('roe')
-            if roe:
-                roe_percent = roe * 100 if roe < 1 else roe
-                if roe_percent > 20:
-                    reasoning_parts.append("excellent returns on equity")
-                elif roe_percent < 5:
-                    reasoning_parts.append("low returns on equity")
-            
-            # Sentiment analysis reasoning
-            avg_sentiment = sentiment_data.get('avg_sentiment', 0)
-            total_articles = sentiment_data.get('total_articles', 0)
-            
-            if sentiment_score >= 70:
-                reasoning_parts.append("positive market sentiment")
-            elif sentiment_score >= 50:
-                reasoning_parts.append("neutral market sentiment")
-            else:
-                reasoning_parts.append("negative market sentiment")
-            
-            if total_articles >= 10:
-                reasoning_parts.append("good news coverage")
-            elif total_articles < 2:
-                reasoning_parts.append("limited news coverage")
-            
-            # Risk factors
+                verdict = f"Caution is advised for {company_name} ({ticker}) with an overall score of {overall_score:.1f}/100, indicating elevated risks."
+
+            # 2. Fundamentals details
+            fund_desc = []
+            pe_val = fundamental_data.get('pe_ratio')
+            roe_val = fundamental_data.get('roe')
             debt_to_equity = fundamental_data.get('debt_to_equity')
-            if debt_to_equity and debt_to_equity > 1.0:
-                reasoning_parts.append("high debt levels")
             
-            # Combine reasoning
-            return ". ".join(reasoning_parts).capitalize() + "."
+            if pe_val is not None:
+                if pe_val < 15:
+                    fund_desc.append(f"is trading at a attractive valuation (P/E ratio of {pe_val:.1f})")
+                elif pe_val > 35:
+                    fund_desc.append(f"is trading at a premium valuation (P/E ratio of {pe_val:.1f})")
+                else:
+                    fund_desc.append(f"displays a fair P/E valuation of {pe_val:.1f}")
+            
+            if roe_val is not None:
+                roe_percent = roe_val * 100 if roe_val < 1 else roe_val
+                if roe_percent > 18:
+                    fund_desc.append(f"shows high capital efficiency with an ROE of {roe_percent:.1f}%")
+                elif roe_percent < 8:
+                    fund_desc.append(f"reports soft profitability with an ROE of {roe_percent:.1f}%")
+            
+            if debt_to_equity is not None:
+                if debt_to_equity > 1.2:
+                    fund_desc.append(f"faces leverage pressure with a debt-to-equity ratio of {debt_to_equity:.2f}")
+                elif debt_to_equity < 0.3:
+                    fund_desc.append(f"maintains a clean balance sheet with low leverage (D/E of {debt_to_equity:.2f})")
+            
+            if fund_desc:
+                fund_sentence = f"Fundamentally, the company {', '.join(fund_desc)}."
+            else:
+                fund_sentence = f"Fundamental analysis score stands at {fundamental_score:.1f}/100."
+
+            # 3. Sentiment details
+            avg_sent = sentiment_data.get('avg_sentiment', 0.0)
+            total_articles = sentiment_data.get('total_articles', 0)
+            pos_pct = sentiment_data.get('sentiment_distribution', {}).get('positive', 0)
+            neg_pct = sentiment_data.get('sentiment_distribution', {}).get('negative', 0)
+            
+            if total_articles > 0:
+                if avg_sent >= 0.15:
+                    sent_sentence = f"Market sentiment is distinctly bullish (compound score of {avg_sent:.2f}), supported by {pos_pct}% positive articles across {total_articles} source(s)."
+                elif avg_sent <= -0.15:
+                    sent_sentence = f"Market sentiment is bearish (compound score of {avg_sent:.2f}), weighed down by {neg_pct}% negative reports across {total_articles} source(s)."
+                else:
+                    sent_sentence = f"News coverage is neutral (compound score of {avg_sent:.2f}) across {total_articles} article(s)."
+            else:
+                sent_sentence = "Limited news flow was detected, leaving sentiment baseline neutral."
+                
+            return f"{verdict} {fund_sentence} {sent_sentence}"
             
         except Exception as e:
-            return f"Analysis completed with overall score of {overall_score:.1f}/100"
+            return f"Analysis completed with overall score of {overall_score:.1f}/100. Fundamentals scored {fundamental_score:.1f} and market sentiment scored {sentiment_score:.1f}."
     
     def _get_error_result(self, ticker: str, company_name: str, error_msg: str) -> Dict:
         """Return error result when aggregation fails"""

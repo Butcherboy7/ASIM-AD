@@ -4,314 +4,328 @@ from typing import Dict, List, Optional
 import time
 from datetime import datetime, timedelta
 import re
+import yfinance as yf
+import xml.etree.ElementTree as ET
 
 # NLP libraries
 try:
     import nltk
     from nltk.sentiment import SentimentIntensityAnalyzer
-    from nltk.tokenize import word_tokenize
-    from nltk.corpus import stopwords
-    
-    # Download required NLTK data
-    nltk.download('vader_lexicon', quiet=True)
-    nltk.download('punkt', quiet=True)
-    nltk.download('stopwords', quiet=True)
+    NLTK_AVAILABLE = True
 except ImportError:
-    print("NLTK not available")
+    NLTK_AVAILABLE = False
 
-try:
-    import spacy
-    # Load English model (will need to be downloaded: python -m spacy download en_core_web_sm)
-    nlp = None
-    try:
-        nlp = spacy.load("en_core_web_sm")
-    except OSError:
-        print("spaCy English model not found. Run: python -m spacy download en_core_web_sm")
-except ImportError:
-    print("spaCy not available")
-    nlp = None
+nlp = None
+
 
 class SentimentAgent:
-    """Agent responsible for sentiment analysis using NewsAPI + NLTK + spaCy"""
-    
+    """
+    Sentiment analysis agent.
+
+    Sources (no API key required):
+      1. yfinance  – news attached to each ticker
+      2. Google Finance RSS  – per-ticker RSS feed
+      3. Yahoo Finance RSS   – per-ticker RSS feed
+
+    Scoring: NLTK VADER compound score.
+    """
+
     def __init__(self):
-        self.news_api_key = os.getenv("NEWS_API_KEY", "your_news_api_key")
-        self.base_url = "https://newsapi.org/v2"
-        self.cache = {}
-        self.cache_duration = 3600  # 1 hour cache for news
-        
-        # Initialize sentiment analyzer
-        try:
-            self.sia = SentimentIntensityAnalyzer()
-        except:
-            self.sia = None
-        
-        # Headers for news API
+        self.cache: Dict = {}
+        self.cache_duration = 3600  # 1 hour
+
+        self.sia = None
+        if NLTK_AVAILABLE:
+            try:
+                # Download required lexicon lazily on first instantiation (cached by Streamlit)
+                nltk.download('vader_lexicon', quiet=True)
+                self.sia = SentimentIntensityAnalyzer()
+            except Exception:
+                self.sia = None
+
         self.headers = {
-            'X-API-Key': self.news_api_key,
-            'User-Agent': 'Stock-Advisor-MVP/1.0'
+            'User-Agent': (
+                'Mozilla/5.0 (Windows NT 10.0; Win64; x64) '
+                'AppleWebKit/537.36 (KHTML, like Gecko) '
+                'Chrome/120.0.0.0 Safari/537.36'
+            )
         }
-    
+
+    # ------------------------------------------------------------------
+    # Public API
+    # ------------------------------------------------------------------
+
     def analyze_sentiment(self, ticker: str, company_name: str) -> Dict:
-        """
-        Analyze sentiment for a stock using news data
-        
-        Args:
-            ticker: Stock ticker symbol
-            company_name: Full company name
-            
-        Returns:
-            Dictionary containing sentiment analysis results
-        """
-        try:
-            # Check cache first
-            cache_key = f"sentiment_{ticker}"
-            if self._is_cached(cache_key):
-                return self.cache[cache_key]['data']
-            
-            # Get news articles
-            news_articles = self._get_news_articles(ticker, company_name)
-            
-            if not news_articles:
-                return self._get_neutral_sentiment(ticker, "No news articles found")
-            
-            # Analyze sentiment
-            sentiment_results = self._analyze_articles_sentiment(news_articles)
-            
-            # Combine with NER analysis if spaCy is available
-            if nlp:
-                ner_results = self._analyze_named_entities(news_articles)
-                sentiment_results.update(ner_results)
-            
-            # Add metadata
-            sentiment_results.update({
+        cache_key = f"sentiment_{ticker}"
+        if self._is_cached(cache_key):
+            return self.cache[cache_key]['data']
+
+        articles = self._fetch_all_articles(ticker, company_name)
+
+        if not articles:
+            result = self._neutral_sentiment(ticker, company_name, "No articles found")
+        else:
+            result = self._analyze_articles(articles)
+            result.update({
                 'ticker': ticker,
                 'company_name': company_name,
                 'analysis_timestamp': time.time(),
-                'total_articles': len(news_articles),
-                'data_source': 'NewsAPI'
+                'total_articles': len(articles),
+                'data_source': 'yfinance + RSS feeds',
             })
-            
-            # Cache results
-            self._cache_data(cache_key, sentiment_results)
-            
-            return sentiment_results
-            
-        except Exception as e:
-            print(f"Error analyzing sentiment for {ticker}: {e}")
-            return self._get_neutral_sentiment(ticker, f"Error: {str(e)}")
-    
-    def _get_news_articles(self, ticker: str, company_name: str) -> List[Dict]:
-        """Fetch news articles from NewsAPI"""
-        try:
-            # Prepare search queries
-            search_queries = [
-                company_name,
-                ticker,
-                f"{company_name} stock",
-                f"{ticker} share price"
-            ]
-            
-            all_articles = []
-            
-            for query in search_queries[:2]:  # Limit to avoid API quota
-                articles = self._search_news(query)
-                all_articles.extend(articles)
-                time.sleep(0.1)  # Small delay between requests
-            
-            # Remove duplicates based on title
-            seen_titles = set()
-            unique_articles = []
-            
-            for article in all_articles:
-                title = article.get('title', '').lower()
-                if title not in seen_titles and len(title) > 10:
-                    seen_titles.add(title)
-                    unique_articles.append(article)
-            
-            return unique_articles[:20]  # Limit to 20 most recent articles
-            
-        except Exception as e:
-            print(f"Error fetching news for {ticker}: {e}")
-            return []
-    
-    def _search_news(self, query: str) -> List[Dict]:
-        """Search for news articles using NewsAPI"""
-        try:
-            # Calculate date range (last 7 days)
-            end_date = datetime.now()
-            start_date = end_date - timedelta(days=7)
-            
-            params = {
-                'q': query,
-                'language': 'en',
-                'sortBy': 'relevancy',
-                'from': start_date.strftime('%Y-%m-%d'),
-                'to': end_date.strftime('%Y-%m-%d'),
-                'pageSize': 20
+            if nlp:
+                result.update(self._ner_analysis(articles))
+
+        self._cache(cache_key, result)
+        return result
+
+    def get_sentiment_summary(self, ticker: str) -> str:
+        data = self.analyze_sentiment(ticker, ticker)
+        score = data.get('avg_sentiment', 0.0)
+        if score >= 0.1:
+            return "Positive market sentiment"
+        elif score <= -0.1:
+            return "Negative market sentiment"
+        return "Neutral market sentiment"
+
+    # ------------------------------------------------------------------
+    # Article fetching
+    # ------------------------------------------------------------------
+
+    def _fetch_all_articles(self, ticker: str, company_name: str) -> List[Dict]:
+        import concurrent.futures
+        articles = []
+        
+        # Fetch news sources concurrently
+        with concurrent.futures.ThreadPoolExecutor(max_workers=3) as executor:
+            futures = {
+                executor.submit(self._fetch_yfinance, ticker): "yfinance",
+                executor.submit(self._fetch_google_rss, ticker, company_name): "google_rss",
+                executor.submit(self._fetch_yahoo_rss, ticker): "yahoo_rss"
             }
             
-            url = f"{self.base_url}/everything"
-            response = requests.get(url, headers=self.headers, params=params, timeout=10)
-            
-            if response.status_code == 200:
-                data = response.json()
-                return data.get('articles', [])
-            else:
-                print(f"NewsAPI error: {response.status_code} - {response.text}")
-                return []
-                
+            for future in concurrent.futures.as_completed(futures):
+                try:
+                    res = future.result()
+                    if res:
+                        articles.extend(res)
+                except Exception as e:
+                    source_name = futures[future]
+                    print(f"[SentimentAgent] Error fetching from {source_name}: {e}")
+
+        # Deduplicate by title
+        seen = set()
+        unique = []
+        for a in articles:
+            key = a.get('title', '')[:80].lower()
+            if key and key not in seen:
+                seen.add(key)
+                unique.append(a)
+
+        return unique[:30]
+
+    # ---- yfinance ----
+    def _fetch_yfinance(self, ticker: str) -> List[Dict]:
+        try:
+            yf_ticker = self._resolve_yf_ticker(ticker)
+            stock = yf.Ticker(yf_ticker)
+            raw_news = stock.news or []
+            articles = []
+            for item in raw_news:
+                pub_raw = item.get('providerPublishTime', time.time())
+                try:
+                    pub_time = datetime.fromtimestamp(pub_raw).strftime('%Y-%m-%dT%H:%M:%SZ')
+                except Exception:
+                    pub_time = datetime.now().strftime('%Y-%m-%dT%H:%M:%SZ')
+
+                articles.append({
+                    'title': item.get('title', ''),
+                    'description': item.get('summary', '') or item.get('description', ''),
+                    'url': item.get('link', ''),
+                    'publishedAt': pub_time,
+                    'source': item.get('publisher', 'Yahoo Finance'),
+                })
+            return articles[:20]
         except Exception as e:
-            print(f"Error searching news: {e}")
+            print(f"[SentimentAgent] yfinance error for {ticker}: {e}")
             return []
-    
-    def _analyze_articles_sentiment(self, articles: List[Dict]) -> Dict:
-        """Analyze sentiment of news articles using NLTK VADER"""
+
+    def _resolve_yf_ticker(self, ticker: str) -> str:
+        if '.' in ticker:
+            return ticker
+        try:
+            info = yf.Ticker(ticker).info
+            if info and info.get('regularMarketPrice') and info.get('longName'):
+                return ticker
+        except Exception:
+            pass
+        return f"{ticker}.NS"
+
+    # ---- Google Finance RSS ----
+    def _fetch_google_rss(self, ticker: str, company_name: str) -> List[Dict]:
+        # Perform 1 query instead of 2 to minimize network overhead and double latency
+        q = company_name.split()[0] if company_name else ticker
+        try:
+            url = (
+                f"https://news.google.com/rss/search"
+                f"?q={requests.utils.quote(q + ' stock')}&hl=en-IN&gl=IN&ceid=IN:en"
+            )
+            resp = requests.get(url, headers=self.headers, timeout=3.5)
+            if resp.status_code == 200:
+                return self._parse_rss(resp.text, 'Google News')[:15]
+        except Exception as e:
+            print(f"[SentimentAgent] Google RSS error: {e}")
+        return []
+
+    # ---- Yahoo Finance RSS ----
+    def _fetch_yahoo_rss(self, ticker: str) -> List[Dict]:
+        yf_ticker = self._resolve_yf_ticker(ticker)
+        url = f"https://feeds.finance.yahoo.com/rss/2.0/headline?s={yf_ticker}&region=US&lang=en-US"
+        try:
+            resp = requests.get(url, headers=self.headers, timeout=3.5)
+            if resp.status_code == 200:
+                return self._parse_rss(resp.text, 'Yahoo Finance RSS')
+        except Exception as e:
+            print(f"[SentimentAgent] Yahoo RSS error: {e}")
+        return []
+
+    def _parse_rss(self, xml_text: str, source: str) -> List[Dict]:
+        articles: List[Dict] = []
+        try:
+            root = ET.fromstring(xml_text)
+            ns = {'dc': 'http://purl.org/dc/elements/1.1/'}
+            for item in root.iter('item'):
+                title = item.findtext('title', '').strip()
+                desc = item.findtext('description', '').strip()
+                # Strip HTML from description
+                desc = re.sub(r'<[^>]+>', '', desc)
+                pub = item.findtext('pubDate', '')
+                link = item.findtext('link', '')
+                articles.append({
+                    'title': title,
+                    'description': desc,
+                    'url': link,
+                    'publishedAt': pub,
+                    'source': source,
+                })
+        except Exception as e:
+            print(f"[SentimentAgent] RSS parse error: {e}")
+        return articles
+
+    # ------------------------------------------------------------------
+    # Analysis
+    # ------------------------------------------------------------------
+
+    def _analyze_articles(self, articles: List[Dict]) -> Dict:
         if not self.sia:
             return {
                 'avg_sentiment': 0.0,
-                'sentiment_distribution': {'positive': 0, 'neutral': 0, 'negative': 0},
-                'error': 'NLTK VADER not available'
+                'sentiment_distribution': {'positive': 0, 'neutral': 100, 'negative': 0},
+                'error': 'NLTK VADER not available',
             }
-        
-        try:
-            sentiments = []
-            positive_count = 0
-            negative_count = 0
-            neutral_count = 0
-            
-            detailed_analysis = []
-            
-            for article in articles:
-                # Combine title and description for analysis
-                text = ""
-                if article.get('title'):
-                    text += article['title'] + " "
-                if article.get('description'):
-                    text += article['description']
-                
-                if len(text.strip()) < 10:
-                    continue
-                
-                # Get VADER sentiment scores
-                scores = self.sia.polarity_scores(text)
-                compound_score = scores['compound']
-                sentiments.append(compound_score)
-                
-                # Classify sentiment
-                if compound_score >= 0.05:
-                    positive_count += 1
-                    sentiment_label = 'positive'
-                elif compound_score <= -0.05:
-                    negative_count += 1
-                    sentiment_label = 'negative'
-                else:
-                    neutral_count += 1
-                    sentiment_label = 'neutral'
-                
-                detailed_analysis.append({
-                    'title': article.get('title', '')[:100],
-                    'sentiment_score': compound_score,
-                    'sentiment_label': sentiment_label,
-                    'published_at': article.get('publishedAt'),
-                    'source': article.get('source', {}).get('name', 'Unknown')
-                })
-            
-            # Calculate average sentiment
-            avg_sentiment = sum(sentiments) / len(sentiments) if sentiments else 0.0
-            
-            # Additional metrics
-            total_articles = len(sentiments)
-            sentiment_volatility = self._calculate_volatility(sentiments) if sentiments else 0.0
-            
-            return {
-                'avg_sentiment': round(avg_sentiment, 3),
-                'sentiment_range': [min(sentiments), max(sentiments)] if sentiments else [0, 0],
-                'sentiment_volatility': round(sentiment_volatility, 3),
-                'positive_count': positive_count,
-                'negative_count': negative_count,
-                'neutral_count': neutral_count,
-                'sentiment_distribution': {
-                    'positive': round(positive_count / total_articles * 100, 1) if total_articles > 0 else 0,
-                    'negative': round(negative_count / total_articles * 100, 1) if total_articles > 0 else 0,
-                    'neutral': round(neutral_count / total_articles * 100, 1) if total_articles > 0 else 0
-                },
-                'detailed_analysis': detailed_analysis[:10],  # Top 10 for display
-                'analysis_method': 'NLTK VADER'
-            }
-            
-        except Exception as e:
-            print(f"Error in sentiment analysis: {e}")
-            return self._get_neutral_sentiment("", f"Analysis error: {str(e)}")
-    
-    def _analyze_named_entities(self, articles: List[Dict]) -> Dict:
-        """Analyze named entities using spaCy"""
+
+        compound_scores: List[float] = []
+        pos = neg = neu = 0
+        detailed: List[Dict] = []
+
+        for article in articles:
+            text = ' '.join(filter(None, [
+                article.get('title', ''),
+                article.get('description', ''),
+            ])).strip()
+            if len(text) < 10:
+                continue
+
+            scores = self.sia.polarity_scores(text)
+            c = scores['compound']
+            compound_scores.append(c)
+
+            if c >= 0.05:
+                pos += 1
+                label = 'positive'
+            elif c <= -0.05:
+                neg += 1
+                label = 'negative'
+            else:
+                neu += 1
+                label = 'neutral'
+
+            detailed.append({
+                'title': article.get('title', '')[:120],
+                'sentiment_score': round(c, 3),
+                'sentiment_label': label,
+                'published_at': article.get('publishedAt', ''),
+                'source': article.get('source', 'Unknown'),
+                'url': article.get('url', ''),
+            })
+
+        total = len(compound_scores)
+        if total == 0:
+            return self._neutral_sentiment('', '', 'No scoreable text')
+
+        avg = sum(compound_scores) / total
+        volatility = self._std(compound_scores)
+
+        return {
+            'avg_sentiment': round(avg, 3),
+            'sentiment_range': [round(min(compound_scores), 3), round(max(compound_scores), 3)],
+            'sentiment_volatility': round(volatility, 3),
+            'positive_count': pos,
+            'negative_count': neg,
+            'neutral_count': neu,
+            'sentiment_distribution': {
+                'positive': round(pos / total * 100, 1),
+                'negative': round(neg / total * 100, 1),
+                'neutral': round(neu / total * 100, 1),
+            },
+            'detailed_analysis': detailed[:10],
+            'analysis_method': 'NLTK VADER + yfinance/RSS',
+        }
+
+    def _ner_analysis(self, articles: List[Dict]) -> Dict:
         if not nlp:
-            return {'ner_analysis': 'spaCy not available'}
-        
+            return {}
         try:
-            all_entities = []
-            entity_sentiment = {}
-            
-            for article in articles:
-                text = ""
-                if article.get('title'):
-                    text += article['title'] + " "
-                if article.get('description'):
-                    text += article['description']
-                
-                if len(text.strip()) < 10:
+            entity_counts: Dict = {}
+            for article in articles[:10]:
+                text = ' '.join(filter(None, [
+                    article.get('title', ''),
+                    article.get('description', ''),
+                ])).strip()
+                if len(text) < 10:
                     continue
-                
-                # Process with spaCy
                 doc = nlp(text)
-                
-                # Extract entities
                 for ent in doc.ents:
-                    if ent.label_ in ['PERSON', 'ORG', 'PRODUCT', 'EVENT']:
-                        entity_text = ent.text.lower()
-                        all_entities.append({
-                            'text': ent.text,
-                            'label': ent.label_,
-                            'article_title': article.get('title', '')[:50]
-                        })
-            
-            # Count entity mentions
-            entity_counts = {}
-            for entity in all_entities:
-                key = (entity['text'], entity['label'])
-                entity_counts[key] = entity_counts.get(key, 0) + 1
-            
-            # Get top entities
-            top_entities = sorted(entity_counts.items(), key=lambda x: x[1], reverse=True)[:10]
-            
+                    if ent.label_ in ('PERSON', 'ORG', 'PRODUCT', 'EVENT'):
+                        key = (ent.text, ent.label_)
+                        entity_counts[key] = entity_counts.get(key, 0) + 1
+
+            top = sorted(entity_counts.items(), key=lambda x: x[1], reverse=True)[:10]
             return {
                 'top_entities': [
-                    {'entity': entity[0], 'label': entity[1], 'mentions': count}
-                    for (entity, label), count in top_entities
+                    {'entity': e[0], 'label': e[1], 'mentions': c}
+                    for (e, _), c in top
                 ],
-                'total_entities_found': len(all_entities),
-                'unique_entities': len(entity_counts),
-                'ner_model': 'spaCy en_core_web_sm'
+                'ner_model': 'spaCy en_core_web_sm',
             }
-            
         except Exception as e:
-            print(f"Error in NER analysis: {e}")
-            return {'ner_analysis': f'Error: {str(e)}'}
-    
-    def _calculate_volatility(self, sentiments: List[float]) -> float:
-        """Calculate sentiment volatility (standard deviation)"""
-        if len(sentiments) < 2:
+            return {'ner_error': str(e)}
+
+    # ------------------------------------------------------------------
+    # Helpers
+    # ------------------------------------------------------------------
+
+    def _std(self, values: List[float]) -> float:
+        if len(values) < 2:
             return 0.0
-        
-        mean = sum(sentiments) / len(sentiments)
-        variance = sum((x - mean) ** 2 for x in sentiments) / len(sentiments)
+        mean = sum(values) / len(values)
+        variance = sum((x - mean) ** 2 for x in values) / len(values)
         return variance ** 0.5
-    
-    def _get_neutral_sentiment(self, ticker: str, reason: str) -> Dict:
-        """Return neutral sentiment when analysis fails"""
+
+    def _neutral_sentiment(self, ticker: str, company_name: str, reason: str) -> Dict:
         return {
             'ticker': ticker,
+            'company_name': company_name,
             'avg_sentiment': 0.0,
             'sentiment_range': [0.0, 0.0],
             'sentiment_volatility': 0.0,
@@ -322,36 +336,14 @@ class SentimentAgent:
             'total_articles': 0,
             'analysis_timestamp': time.time(),
             'note': reason,
-            'analysis_method': 'fallback'
+            'analysis_method': 'fallback',
+            'data_source': 'none',
         }
-    
-    def _is_cached(self, cache_key: str) -> bool:
-        """Check if data is cached and still valid"""
-        if cache_key not in self.cache:
+
+    def _is_cached(self, key: str) -> bool:
+        if key not in self.cache:
             return False
-        
-        cache_time = self.cache[cache_key]['timestamp']
-        return (time.time() - cache_time) < self.cache_duration
-    
-    def _cache_data(self, cache_key: str, data: Dict):
-        """Cache data with timestamp"""
-        self.cache[cache_key] = {
-            'data': data,
-            'timestamp': time.time()
-        }
-    
-    def get_sentiment_summary(self, ticker: str) -> str:
-        """Get a human-readable sentiment summary"""
-        try:
-            sentiment_data = self.analyze_sentiment(ticker, ticker)
-            avg_sentiment = sentiment_data.get('avg_sentiment', 0.0)
-            
-            if avg_sentiment >= 0.1:
-                return "Positive market sentiment"
-            elif avg_sentiment <= -0.1:
-                return "Negative market sentiment"
-            else:
-                return "Neutral market sentiment"
-                
-        except:
-            return "Sentiment analysis unavailable"
+        return (time.time() - self.cache[key]['timestamp']) < self.cache_duration
+
+    def _cache(self, key: str, data: Dict):
+        self.cache[key] = {'data': data, 'timestamp': time.time()}

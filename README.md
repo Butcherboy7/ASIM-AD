@@ -9,17 +9,17 @@ A sophisticated multi-agent AI system that provides intelligent stock analysis a
 - **🎯 Sector-Based Analysis**: Choose from IT, Banking, Auto, Pharma, Green Energy, and Diversified sectors
 - **⚖️ Customizable Weighting**: Adjust balance between fundamental and sentiment analysis (0-100%)
 - **📊 Real-Time Data**: Live financial metrics via yfinance API
-- **📰 News Sentiment**: Latest market sentiment using NewsAPI + NLTK + spaCy
-- **🔍 Interactive UI**: Modern Streamlit interface with expandable analysis cards
-- **📈 Visual Charts**: Performance comparison charts using Plotly
-- **💾 Smart Caching**: Two-tier caching system for optimal performance
+- **📰 News Sentiment**: Real-time news sentiment analysis via Yahoo Finance, Google RSS, and Yahoo RSS feeds (no API key required, fallback news support)
+- **⚡ Parallel Execution**: Multi-threaded parallel fetching using `ThreadPoolExecutor` to load multiple stocks concurrently (4-5x speedup)
+- **💾 Smart Caching**: Streamlit-level caching (`@st.cache_data`) for stock queries, enabling instant loading of cached tickers and zero-latency slider weighting adjustments
+- **🔍 Interactive Responsive UI**: Sleek glassmorphic dark theme featuring optimized Plotly radar charts, responsive layout sizing, and detailed analysis cards
+- **📈 Dynamic Progress**: Real-time progress updates tracking concurrent agent execution without arbitrary delays
 
 ## 🚀 Quick Start
 
 ### Prerequisites
 
 - Python 3.8+
-- NewsAPI key (free at [newsapi.org](https://newsapi.org))
 
 ### Installation
 
@@ -31,21 +31,16 @@ A sophisticated multi-agent AI system that provides intelligent stock analysis a
 
 2. **Install dependencies**
    ```bash
-   pip install streamlit pandas numpy yfinance requests beautifulsoup4 trafilatura nltk spacy plotly python-dateutil
+   pip install -r requirements.txt
    python -m spacy download en_core_web_sm
    ```
 
-3. **Set up environment variables**
+3. **Run the application**
    ```bash
-   export NEWS_API_KEY="your_newsapi_key_here"
+   streamlit run app.py
    ```
 
-4. **Run the application**
-   ```bash
-   streamlit run app.py --server.port 5000
-   ```
-
-5. **Open your browser** to `http://localhost:5000`
+4. **Open your browser** to `http://localhost:8501`
 
 ## 🏗️ Architecture
 
@@ -54,8 +49,8 @@ A sophisticated multi-agent AI system that provides intelligent stock analysis a
 ```
 ┌─────────────────┐    ┌─────────────────┐    ┌─────────────────┐
 │ Screening Agent │    │Fundamental Agent│    │ Sentiment Agent │
-│                 │    │                 │    │                 │
-│ • Sector stocks │    │ • yfinance API  │    │ • NewsAPI       │
+│                 │    │ (Concurrent)    │    │ (Concurrent)    │
+│ • Sector stocks │    │ • yfinance API  │    │ • Google/Yahoo  │
 │ • Stock lists   │    │ • PE, PB, ROE   │    │ • NLTK VADER    │
 │ • Fallback data │    │ • Market cap    │    │ • spaCy NLP     │
 └─────────────────┘    └─────────────────┘    └─────────────────┘
@@ -75,10 +70,10 @@ A sophisticated multi-agent AI system that provides intelligent stock analysis a
 
 - **🎯 Screening Agent**: Curated stock lists by sector with fallback mechanisms
 - **📊 Fundamental Agent**: Financial analysis using yfinance (PE, PB, ROE, etc.)
-- **📰 Sentiment Agent**: News sentiment analysis using NewsAPI + NLP
+- **📰 Sentiment Agent**: News scraping & VADER sentiment analysis
+- **⚡ Concurrency Coordinator**: Parallel query dispatcher powered by `ThreadPoolExecutor`
 - **🔧 Aggregator Agent**: Weighted score combination and final recommendations
-- **💾 Cache Manager**: Two-tier caching (memory + file) for performance
-- **📏 Data Normalizer**: Standardized 0-100 scoring across all metrics
+- **💾 Cache Tier**: Persistence cache layer alongside Streamlit caching for rapid page updates
 
 ## 📋 Usage Guide
 
