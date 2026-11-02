@@ -1,260 +1,362 @@
-# 🤖 AI Stock Advisor
+# StockSage
 
-A sophisticated multi-agent AI system that provides intelligent stock analysis and investment recommendations for Indian market stocks. Built for hackathons and demonstrations, this system combines fundamental analysis with sentiment analysis to deliver actionable investment insights.
+StockSage scores Indian (NSE) stocks from 0 to 100 and tells you **Buy, Hold or Sell**. Part of the score comes from the company's numbers (price, profit, debt) and part from how positive or negative the latest news is. You choose how much each part counts.
 
-![AI Stock Advisor Screenshot](https://via.placeholder.com/800x400?text=AI+Stock+Advisor+Dashboard)
+It is a college / hackathon project. It is **not financial advice**.
 
-## 🌟 Features
+- Pick a sector (IT, Banking, Auto, Pharma, Green Energy, Diversified) **or** type company names like `Infosys, Reliance`. You do not need to know ticker symbols.
+- Watch each agent work live: Screening, Fundamental, Sentiment and Aggregator.
+- Read a ranked table, then open any stock for its numbers, a chart, a plain-English summary and the news behind its score.
+- Small `?` icons explain every term in plain words.
 
-- **🎯 Sector-Based Analysis**: Choose from IT, Banking, Auto, Pharma, Green Energy, and Diversified sectors
-- **⚖️ Customizable Weighting**: Adjust balance between fundamental and sentiment analysis (0-100%)
-- **📊 Real-Time Data**: Live financial metrics via yfinance API
-- **📰 News Sentiment**: Real-time news sentiment analysis via Yahoo Finance, Google RSS, and Yahoo RSS feeds (no API key required)
-- **⚡ Parallel Execution**: Multi-threaded parallel fetching using `ThreadPoolExecutor` to load multiple stocks concurrently (4-5x speedup)
-- **💾 Smart Caching & Lazy Load**: Streamlit-level caching (`@st.cache_data`) for stock queries and lazy NLTK/NLP loading, enabling instant boot times and zero-latency slider weighting adjustments
-- **🔍 Interactive Responsive UI**: Sleek glassmorphic dark theme featuring optimized Plotly radar charts, responsive layout sizing, and detailed analysis cards
-- **📰 Referenced News Display**: Dedicated collapsible news reference section inside each card, showing article headers (clickable links), sources, dates, and color-coded sentiment scores
-- **📈 Dynamic Progress**: Real-time progress updates tracking concurrent agent execution without arbitrary delays
-- **🛠️ DOM Layout & Scroll Fixes**: Resolved all container height collapses and iframe truncation by utilizing native Streamlit forms and applying explicit viewport scrolling constraints (`overflow-y: auto`)
-
-## 🚀 Quick Start
-
-### Prerequisites
-
-- Python 3.8+
-
-### Installation
-
-1. **Clone the repository**
-   ```bash
-   git clone https://github.com/yourusername/ai-stock-advisor.git
-   cd ai-stock-advisor
-   ```
-
-2. **Install dependencies**
-   ```bash
-   pip install -r requirements.txt
-   python -m spacy download en_core_web_sm
-   ```
-
-3. **Run the application**
-   ```bash
-   streamlit run app.py
-   ```
-
-4. **Open your browser** to `http://localhost:8501`
-
-## 🏗️ Architecture
-
-### Multi-Agent System
-
-```
-┌─────────────────┐    ┌─────────────────┐    ┌─────────────────┐
-│ Screening Agent │    │Fundamental Agent│    │ Sentiment Agent │
-│                 │    │ (Concurrent)    │    │ (Concurrent)    │
-│ • Sector stocks │    │ • yfinance API  │    │ • Google/Yahoo  │
-│ • Stock lists   │    │ • PE, PB, ROE   │    │ • NLTK VADER    │
-│ • Fallback data │    │ • Market cap    │    │ • spaCy NLP     │
-└─────────────────┘    └─────────────────┘    └─────────────────┘
-         │                       │                       │
-         └───────────────────────┼───────────────────────┘
-                                 │
-                    ┌─────────────────┐
-                    │ Aggregator Agent│
-                    │                 │
-                    │ • Score fusion  │
-                    │ • Recommendations│
-                    │ • BUY/HOLD/SELL │
-                    └─────────────────┘
-```
-
-### Key Components
-
-- **🎯 Screening Agent**: Curated stock lists by sector with fallback mechanisms
-- **📊 Fundamental Agent**: Financial analysis using yfinance (PE, PB, ROE, etc.)
-- **📰 Sentiment Agent**: News scraping & VADER sentiment analysis
-- **⚡ Concurrency Coordinator**: Parallel query dispatcher powered by `ThreadPoolExecutor`
-- **🔧 Aggregator Agent**: Weighted score combination and final recommendations
-- **💾 Cache Tier**: Persistence cache layer alongside Streamlit caching for rapid page updates
-
-## 📋 Usage Guide
-
-### 1. Choose Your Sector
-Select from predefined sectors:
-- 🖥️ **IT & Tech**: TCS, INFY, HCLTECH, WIPRO, TECHM
-- 🏦 **Banking**: HDFCBANK, ICICIBANK, SBI, KOTAKBANK, AXISBANK
-- 🚗 **Auto**: MARUTI, TATAMOTORS, M&M, BAJAJ-AUTO, EICHERMOT
-- ⚗️ **Pharma**: SUNPHARMA, DRREDDY, CIPLA, DIVISLAB, BIOCON
-- 🌿 **Green Energy**: ADANIGREEN, SUZLON, TATAPOWER, NTPC, POWERGRID
-- 🏭 **Diversified**: RELIANCE, ITC, HINDUNILVR, LT, ASIANPAINT
-
-### 2. Set Analysis Balance
-Use the interactive slider to adjust weighting:
-- **Left (0%)**: Pure fundamental analysis
-- **Center (50%)**: Balanced approach
-- **Right (100%)**: Pure sentiment analysis
-
-### 3. Advanced Options
-- **Stock Count**: Analyze 3-10 stocks per sector
-- **Risk Tolerance**: Conservative, Moderate, or Aggressive
-
-### 4. Review Results
-- **Summary Cards**: Quick overview of BUY/HOLD/SELL counts
-- **Performance Chart**: Visual comparison of all analyzed stocks
-- **Detailed Cards**: Expandable analysis with full metrics and reasoning
-
-## 🔧 Configuration
-
-### Streamlit Configuration
-Create `.streamlit/config.toml` (this is automatically set up in the workspace):
-```toml
-[theme]
-primaryColor = "#3b82f6"
-backgroundColor = "#050505"
-secondaryBackgroundColor = "#111111"
-textColor = "#ffffff"
-font = "sans serif"
-
-[server]
-headless = true
-enableCORS = false
-enableXsrfProtection = false
-```
-
-## 📊 API Reference
-
-### External APIs & Feeds Used (No Keys Required)
-
-1. **yfinance**: Stock fundamental data and company-specific news
-   - Financial ratios (PE, PB, ROE)
-   - Market cap and pricing data
-   - Company information and basic news links
-
-2. **Google News RSS Feed**: Public dynamic search feed
-   - Fetched concurrently in the background
-   - Retrieves real-time regional global news headlines
-
-3. **Yahoo Finance RSS Feed**: headline RSS endpoints
-   - Fetched concurrently for supplementary news coverage
-
-4. **NLTK (VADER)**: Local NLP processing
-   - Rule-based sentiment intensity analysis running locally (no API calls)
-
-## 🎯 Scoring System
-
-### Fundamental Scoring (0-100)
-- **PE Ratio**: Valuation scoring (optimized ranges)
-- **PB Ratio**: Book value assessment
-- **ROE**: Return on equity evaluation (>15% preferred)
-- **Debt-to-Equity**: Financial stability (lower is better)
-- **Profit Margins**: Operational efficiency
-
-### Sentiment Scoring (0-100)
-- **Article Coverage**: Quantity of unique news articles found
-- **Sentiment Ratio**: Balance of positive vs negative compound scores
-- **Volatility**: Sentiment variation across articles
-
-### Final Recommendations
-- **BUY**: Score ≥ 70
-- **HOLD**: Score 40-69
-- **SELL**: Score < 40
-
-## 🚧 Development
-
-### Project Structure
-```
-ai-stock-advisor/
-├── agents/
-│   ├── screening_agent.py      # Stock discovery and selection
-│   ├── fundamental_agent.py    # Financial analysis
-│   ├── sentiment_agent.py      # News sentiment analysis
-│   └── aggregator_agent.py     # Score aggregation
-├── utils/
-│   ├── cache_manager.py        # Caching system
-│   └── data_normalizer.py      # Score normalization
-├── .streamlit/
-│   └── config.toml            # Streamlit configuration
-├── app.py                     # Main application
-├── requirements.txt           # Python dependencies
-├── README.md                 # This file
-└── replit.md                 # Project documentation
-```
-
-### Adding New Sectors
-1. Update sector dictionary in `app.py`
-2. Add corresponding stock tickers
-3. Test with your desired stock count
-
-### Customizing Scoring
-1. Modify `DataNormalizer` class for different score ranges
-2. Adjust recommendation thresholds in `AggregatorAgent`
-3. Update sector-specific benchmarks
-
-## 🔒 Security & Limitations
-
-### Security Considerations
-- No API keys or credentials required (uses public feeds only)
-- No financial advice disclaimer included
-- Rate limiting considerations implemented for public API requests
-- Input validation for all user parameters
-
-### Current Limitations
-- **Demo Purpose**: Built for hackathons, not production trading
-- **Indian Market Focus**: Optimized for NSE-listed stocks
-- **API Dependencies**: Requires stable internet connection to fetch real-time data
-- **No Real-time Trading**: Analysis only, no order execution
-- **Cache TTL**: 10-minute cache for fundamentals and 30-minute cache for sentiment data
-
-## 🤝 Contributing
-
-We welcome contributions! Please follow these steps:
-
-1. **Fork the repository**
-2. **Create a feature branch**
-   ```bash
-   git checkout -b feature/amazing-feature
-   ```
-3. **Make your changes**
-4. **Add tests** (if applicable)
-5. **Commit your changes**
-   ```bash
-   git commit -m 'Add amazing feature'
-   ```
-6. **Push to the branch**
-   ```bash
-   git push origin feature/amazing-feature
-   ```
-7. **Open a Pull Request**
-
-### Development Guidelines
-- Follow PEP 8 style guidelines
-- Add docstrings to all functions
-- Update tests for new features
-- Maintain backward compatibility
-- Update documentation as needed
-
-## 📜 License
-
-This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
-
-## 🙏 Acknowledgments
-
-- **yfinance**: For providing free access to financial data
-- **NewsAPI**: For real-time news sentiment data
-- **Streamlit**: For the amazing web app framework
-- **NLTK & spaCy**: For powerful NLP capabilities
-- **Plotly**: For interactive data visualization
-
-## 📞 Support
-
-- **Issues**: Report bugs via [GitHub Issues](https://github.com/yourusername/ai-stock-advisor/issues)
-- **Discussions**: Join conversations in [GitHub Discussions](https://github.com/yourusername/ai-stock-advisor/discussions)
-- **Documentation**: Check the `replit.md` file for technical details
-
-## ⚠️ Disclaimer
-
-This tool is for educational and demonstration purposes only. It does not constitute financial advice. Always consult with qualified financial advisors before making investment decisions. Past performance does not guarantee future results.
+No API keys, no accounts, no payment. Everything uses free public data.
 
 ---
 
-**Built with ❤️ for the developer community**
+## Table of contents
+
+1. [What you need](#1-what-you-need)
+2. [Install Python](#2-install-python)
+3. [Download the project](#3-download-the-project)
+4. [Open a terminal in the project folder](#4-open-a-terminal-in-the-project-folder)
+5. [Create the virtual environment](#5-create-the-virtual-environment)
+6. [Install the requirements](#6-install-the-requirements)
+7. [Run the app](#7-run-the-app)
+8. [Using the app](#8-using-the-app)
+9. [Next time you want to run it](#9-next-time-you-want-to-run-it)
+10. [Troubleshooting](#10-troubleshooting)
+11. [How it works](#11-how-it-works)
+12. [Project structure](#12-project-structure)
+13. [Limitations and disclaimer](#13-limitations-and-disclaimer)
+
+---
+
+## 1. What you need
+
+| Thing | Details |
+|---|---|
+| Computer | Windows 10/11, macOS, or Linux |
+| Python | Version **3.10 or newer** (3.11, 3.12 and 3.13 all work) |
+| Internet | Needed every time you run an analysis (it fetches live prices and news) |
+| Git | Optional. You can download a ZIP instead |
+| Disk space | About 500 MB |
+
+---
+
+## 2. Install Python
+
+Check whether you already have it. Open a terminal (see [step 4](#4-open-a-terminal-in-the-project-folder) for how) and run:
+
+**Windows**
+```powershell
+python --version
+```
+
+**macOS / Linux**
+```bash
+python3 --version
+```
+
+If it prints `Python 3.10` or higher (for example `Python 3.12.4`), skip to step 3.
+
+If you get an error like *"Python was not found"* or the version is older than 3.10:
+
+- **Windows:** go to <https://www.python.org/downloads/>, click the big yellow **Download Python** button, run the installer, and **tick the box "Add python.exe to PATH" on the first screen** before clicking *Install Now*. Close and reopen your terminal afterwards.
+- **macOS:** download the installer from <https://www.python.org/downloads/macos/>, or with Homebrew run `brew install python`.
+- **Linux (Ubuntu/Debian):**
+  ```bash
+  sudo apt update
+  sudo apt install -y python3 python3-venv python3-pip
+  ```
+
+---
+
+## 3. Download the project
+
+Pick **one** of these two ways.
+
+### Option A: with Git (recommended)
+
+```bash
+git clone https://github.com/Butcherboy7/ASIM-AD.git
+```
+
+Don't have Git? Get it from <https://git-scm.com/downloads> (accept the default options), then reopen your terminal.
+
+### Option B: without Git (ZIP)
+
+1. Open <https://github.com/Butcherboy7/ASIM-AD> in your browser.
+2. Click the green **Code** button, then **Download ZIP**.
+3. Right-click the downloaded file and choose **Extract All** (Windows) or double-click it (macOS).
+4. Move the extracted folder somewhere easy, such as your Desktop.
+
+---
+
+## 4. Open a terminal in the project folder
+
+A *terminal* is a window where you type commands. You need one that is "inside" the project folder.
+
+### Windows
+
+**Easiest way (File Explorer):**
+1. Open the project folder in File Explorer (the folder that contains `app.py`).
+2. Click the address bar at the top, type `powershell`, and press **Enter**.
+3. A blue PowerShell window opens already inside the right folder.
+
+**Or from the Start menu:**
+1. Press the **Windows key**, type `PowerShell`, press **Enter**.
+2. Go to the project folder. If you cloned it to your Desktop, type:
+   ```powershell
+   cd $HOME\Desktop\ASIM-AD
+   ```
+   (Change `ASIM-AD` to whatever your folder is called.)
+
+### macOS
+
+1. Press **Cmd + Space**, type `Terminal`, press **Enter**.
+2. Go to the project folder. If it is on your Desktop:
+   ```bash
+   cd ~/Desktop/ASIM-AD
+   ```
+
+Tip: you can also type `cd ` (with a space), then drag the folder from Finder into the Terminal window and press Enter.
+
+### Linux
+
+1. Press **Ctrl + Alt + T**.
+2. Go to the folder:
+   ```bash
+   cd ~/Desktop/ASIM-AD
+   ```
+
+### Using VS Code instead
+
+1. Open VS Code, choose **File > Open Folder**, and pick the project folder.
+2. Open a terminal with **Terminal > New Terminal** (or press **Ctrl + `**). It opens already inside the project folder.
+
+### Check you are in the right place
+
+Run this. You should see `app.py` and `requirements.txt` in the list.
+
+**Windows:** `dir`  
+**macOS / Linux:** `ls`
+
+---
+
+## 5. Create the virtual environment
+
+A virtual environment keeps this project's libraries separate from the rest of your computer. You only create it once.
+
+### Windows (PowerShell)
+
+```powershell
+python -m venv .venv
+.venv\Scripts\Activate.ps1
+```
+
+If you see a red error about *"running scripts is disabled on this system"*, run this once and then try the activate line again:
+
+```powershell
+Set-ExecutionPolicy -Scope Process -ExecutionPolicy Bypass
+.venv\Scripts\Activate.ps1
+```
+
+### Windows (Command Prompt / cmd)
+
+```bat
+python -m venv .venv
+.venv\Scripts\activate.bat
+```
+
+### macOS / Linux
+
+```bash
+python3 -m venv .venv
+source .venv/bin/activate
+```
+
+**How to tell it worked:** your terminal line now starts with `(.venv)`.
+
+---
+
+## 6. Install the requirements
+
+With `(.venv)` showing, run:
+
+```bash
+python -m pip install --upgrade pip
+pip install -r requirements.txt
+```
+
+This downloads the libraries (Streamlit, pandas, yfinance, Plotly, NLTK and a few more). It takes 1 to 5 minutes. Wait until you get your prompt back with no red error text.
+
+---
+
+## 7. Run the app
+
+```bash
+streamlit run app.py
+```
+
+After a few seconds you will see:
+
+```
+  Local URL: http://localhost:8501
+```
+
+Your browser should open by itself. If it does not, open it and go to:
+
+**<http://localhost:8501>**
+
+Leave the terminal window open while you use the app. Closing it stops the app.
+
+**The first analysis is slower** (around 10 to 30 seconds) because it downloads a small sentiment dictionary once and fetches fresh data. After that, results are cached and repeat runs are quick.
+
+To stop the app, click the terminal and press **Ctrl + C**.
+
+---
+
+## 8. Using the app
+
+1. **Sector:** pick one from the dropdown. That is all you need to do.
+2. **Or type your own stocks (optional):** type company names or ticker symbols separated by commas, for example `Infosys, Reliance, HDFC Bank`. If this box has anything in it, it is used instead of the sector.
+3. **How many sector stocks:** how many companies from the sector to compare (1 to 5).
+4. **Weight on fundamentals:** how much the company's own numbers count versus the news. `60` means 60% numbers, 40% news. Not sure? Leave it at 60.
+5. Press **Run analysis** and watch the four agents work.
+6. Read the **ranked table**. The bar in each row shows how much of the score came from company numbers (teal) and news (black). The thin lines mark 40 and 70.
+7. Click a stock name under **Inspect a stock** for its full breakdown, a plain-English summary, a chart, and the news headlines it was based on.
+
+Hover over (or tap) any small `?` to see what a term means.
+
+**Reading the result**
+
+| Score | Signal | Meaning |
+|---|---|---|
+| 70 to 100 | **Buy** | Looks attractive on this formula |
+| 40 to 69 | **Hold** | Neither clearly good nor clearly bad |
+| 0 to 39 | **Sell** | Looks weak on this formula |
+
+---
+
+## 9. Next time you want to run it
+
+You do **not** repeat the install. Open a terminal in the project folder (step 4), then:
+
+**Windows (PowerShell)**
+```powershell
+.venv\Scripts\Activate.ps1
+streamlit run app.py
+```
+
+**macOS / Linux**
+```bash
+source .venv/bin/activate
+streamlit run app.py
+```
+
+Want it updated to the latest code? Run `git pull` first, then `pip install -r requirements.txt` again.
+
+---
+
+## 10. Troubleshooting
+
+**`python` is not recognized / command not found**
+Windows: try `py -m venv .venv` instead of `python -m venv .venv`. If that also fails, reinstall Python and tick *Add python.exe to PATH*. macOS / Linux: use `python3`.
+
+**`streamlit` is not recognized**
+Your virtual environment is not active. Run the activate command from step 5 (you should see `(.venv)`), or run the app with:
+```bash
+python -m streamlit run app.py
+```
+
+**"Running scripts is disabled" in PowerShell**
+```powershell
+Set-ExecutionPolicy -Scope Process -ExecutionPolicy Bypass
+.venv\Scripts\Activate.ps1
+```
+
+**Port 8501 is already in use**
+Another copy is running. Close it (Ctrl + C in its terminal), or use a different port:
+```bash
+streamlit run app.py --server.port 8502
+```
+Then open <http://localhost:8502>.
+
+**`pip install` fails with a long red error**
+Make sure Python is 3.10 or newer (`python --version`) and that you are using `requirements.txt` from this repository. Then retry:
+```bash
+python -m pip install --upgrade pip
+pip install -r requirements.txt
+```
+
+**"No market data found for ..."**
+The name or symbol was not recognised, or Yahoo Finance had no data for it. Check the spelling, or try the NSE ticker (for example `TCS`, `RELIANCE`, `HDFCBANK`).
+
+**Lines such as `HTTP Error 404 ... Quote not found` in the terminal**
+Yahoo Finance sometimes rejects a lookup and the app retries a different way. The result still appears. You can ignore these.
+
+**Everything shows N/A or the news list is empty**
+You may be offline, or a free data source is rate-limiting you. Wait a minute and run again.
+
+**The page looks wrong or stale after updating the code**
+Hard refresh the browser (**Ctrl + Shift + R**, or **Cmd + Shift + R** on macOS).
+
+---
+
+## 11. How it works
+
+Four small agents run as a pipeline. Stocks are analysed in parallel, and the app shows each agent's progress live.
+
+```
+ Screening agent         Fundamental agent        Sentiment agent          Aggregator agent
+ chooses the stocks  ->  price, P/E, ROE,     ->  reads recent news    ->  blends both scores with
+                         debt, margins            headlines, scores        your weighting into
+                         (Yahoo Finance)          their tone (VADER)       Buy / Hold / Sell
+```
+
+- **Fundamental score (0 to 100):** built from P/E, P/B, return on equity, debt to equity and profit margins.
+- **Sentiment score (0 to 100):** built from how many articles were found and how positive or negative they are. Headlines come from Google News and Yahoo Finance RSS, scored locally with NLTK VADER.
+- **Final score:** `fundamental score x your weight + sentiment score x (100 - your weight)`, then mapped to Buy (70+), Hold (40 to 69) or Sell (below 40).
+- **Caching:** fundamentals are cached for 10 minutes and sentiment for 30 minutes, so repeat runs are fast.
+
+Data sources: [yfinance](https://github.com/ranaroussi/yfinance), Google News RSS, Yahoo Finance RSS. No API keys are required.
+
+---
+
+## 12. Project structure
+
+```
+.
+├── app.py                      # The Streamlit app (UI + wiring)
+├── agents/
+│   ├── screening_agent.py      # Stock selection
+│   ├── fundamental_agent.py    # Company numbers from Yahoo Finance
+│   ├── sentiment_agent.py      # News fetching + sentiment scoring
+│   └── aggregator_agent.py     # Combines scores, makes the call
+├── utils/
+│   ├── cache_manager.py        # Caching helpers
+│   └── data_normalizer.py      # Score normalisation
+├── .streamlit/config.toml      # Light theme settings
+├── requirements.txt            # Python libraries (install with pip)
+├── PRODUCT.md                  # Short product description (design context)
+└── README.md                   # This file
+```
+
+**Add a sector:** edit the `SECTORS` dictionary near the top of `app.py` and, optionally, add the company names to `COMPANY_NAMES` so typing the name works.
+
+**Change the Buy / Hold / Sell cut-offs:** edit the thresholds at the top of `agents/aggregator_agent.py`.
+
+---
+
+## 13. Limitations and disclaimer
+
+- Built for a college demo, not for real trading.
+- Focused on NSE-listed Indian stocks.
+- Needs a working internet connection. Free data sources can be slow, incomplete or rate-limited.
+- Scores come from a simple formula over public data. They do not predict the future.
+
+**This is not financial advice.** Do not make investment decisions based on this tool. Speak to a qualified financial adviser.
+
+## License
+
+MIT. See [LICENSE](LICENSE).
