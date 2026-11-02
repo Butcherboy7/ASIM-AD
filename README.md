@@ -16,18 +16,19 @@ No API keys, no accounts, no payment. Everything uses free public data.
 ## Table of contents
 
 1. [What you need](#1-what-you-need)
-2. [Install Python](#2-install-python)
-3. [Download the project](#3-download-the-project)
-4. [Open a terminal in the project folder](#4-open-a-terminal-in-the-project-folder)
+2. [Install VS Code, Python and Git](#2-install-vs-code-python-and-git)
+3. [Get the project into VS Code (clone or ZIP)](#3-get-the-project-into-vs-code-clone-or-zip)
+4. [Open the terminal inside VS Code](#4-open-the-terminal-inside-vs-code)
 5. [Create the virtual environment](#5-create-the-virtual-environment)
 6. [Install the requirements](#6-install-the-requirements)
 7. [Run the app](#7-run-the-app)
 8. [Using the app](#8-using-the-app)
 9. [Next time you want to run it](#9-next-time-you-want-to-run-it)
-10. [Troubleshooting](#10-troubleshooting)
-11. [How it works](#11-how-it-works)
-12. [Project structure](#12-project-structure)
-13. [Limitations and disclaimer](#13-limitations-and-disclaimer)
+10. [Push your changes to GitHub](#10-push-your-changes-to-github)
+11. [Troubleshooting](#11-troubleshooting)
+12. [How it works](#12-how-it-works)
+13. [Project structure](#13-project-structure)
+14. [Limitations and disclaimer](#14-limitations-and-disclaimer)
 
 ---
 
@@ -36,110 +37,93 @@ No API keys, no accounts, no payment. Everything uses free public data.
 | Thing | Details |
 |---|---|
 | Computer | Windows 10/11, macOS, or Linux |
+| VS Code | Free editor from Microsoft |
 | Python | Version **3.10 or newer** (3.11, 3.12 and 3.13 all work) |
+| Git | Needed to clone and to push. Free |
+| GitHub account | Needed only if you want to push your changes |
 | Internet | Needed every time you run an analysis (it fetches live prices and news) |
-| Git | Optional. You can download a ZIP instead |
 | Disk space | About 500 MB |
 
 ---
 
-## 2. Install Python
+## 2. Install VS Code, Python and Git
 
-Check whether you already have it. Open a terminal (see [step 4](#4-open-a-terminal-in-the-project-folder) for how) and run:
+Skip any you already have.
 
-**Windows**
-```powershell
-python --version
-```
+**VS Code:** download from <https://code.visualstudio.com/> and install with the default options.
 
-**macOS / Linux**
-```bash
-python3 --version
-```
-
-If it prints `Python 3.10` or higher (for example `Python 3.12.4`), skip to step 3.
-
-If you get an error like *"Python was not found"* or the version is older than 3.10:
-
-- **Windows:** go to <https://www.python.org/downloads/>, click the big yellow **Download Python** button, run the installer, and **tick the box "Add python.exe to PATH" on the first screen** before clicking *Install Now*. Close and reopen your terminal afterwards.
-- **macOS:** download the installer from <https://www.python.org/downloads/macos/>, or with Homebrew run `brew install python`.
+**Python:** download from <https://www.python.org/downloads/>.
+- **Windows:** run the installer and **tick "Add python.exe to PATH" on the first screen** before clicking *Install Now*.
+- **macOS:** use the installer from <https://www.python.org/downloads/macos/>.
 - **Linux (Ubuntu/Debian):**
   ```bash
   sudo apt update
-  sudo apt install -y python3 python3-venv python3-pip
+  sudo apt install -y python3 python3-venv python3-pip git
   ```
+
+**Git:** download from <https://git-scm.com/downloads> and install with the default options.
+
+**After installing, close VS Code completely and open it again.** Then add the Python extension:
+1. Press **Ctrl + Shift + X** (Extensions).
+2. Search for `Python` and install the one by **Microsoft**.
 
 ---
 
-## 3. Download the project
+## 3. Get the project into VS Code (clone or ZIP)
 
-Pick **one** of these two ways.
+Pick **one** option. **Use Option A if you plan to push changes to GitHub.**
 
-### Option A: with Git (recommended)
+### Option A: Clone inside VS Code (recommended)
 
+1. Open VS Code.
+2. Press **Ctrl + Shift + P** (**Cmd + Shift + P** on macOS) to open the Command Palette.
+3. Type `Git: Clone` and press **Enter**.
+4. Paste this address and press **Enter**:
+   ```
+   https://github.com/Butcherboy7/ASIM-AD.git
+   ```
+5. A window asks where to save it. Pick a folder such as your Desktop, then click **Select as Repository Destination**.
+6. When VS Code asks *"Would you like to open the cloned repository?"* click **Open**.
+7. If it asks *"Do you trust the authors of the files in this folder?"* click **Yes, I trust the authors**.
+
+You will see the files (`app.py`, `README.md`, `agents`, and so on) in the left sidebar.
+
+**Same thing from the terminal** (only if you prefer typing):
 ```bash
 git clone https://github.com/Butcherboy7/ASIM-AD.git
+cd ASIM-AD
+code .
 ```
 
-Don't have Git? Get it from <https://git-scm.com/downloads> (accept the default options), then reopen your terminal.
-
-### Option B: without Git (ZIP)
+### Option B: Download the ZIP
 
 1. Open <https://github.com/Butcherboy7/ASIM-AD> in your browser.
 2. Click the green **Code** button, then **Download ZIP**.
-3. Right-click the downloaded file and choose **Extract All** (Windows) or double-click it (macOS).
-4. Move the extracted folder somewhere easy, such as your Desktop.
+3. Extract it: right-click the file and choose **Extract All** (Windows), or double-click it (macOS).
+4. In VS Code choose **File > Open Folder**, pick the extracted folder (the one containing `app.py`), and click **Select Folder**.
+5. Click **Yes, I trust the authors** if asked.
+
+A ZIP has no Git history, so you cannot push from it directly. If you later want to push, clone the repository instead (Option A), or see the ZIP note in [step 10](#10-push-your-changes-to-github).
 
 ---
 
-## 4. Open a terminal in the project folder
+## 4. Open the terminal inside VS Code
 
-A *terminal* is a window where you type commands. You need one that is "inside" the project folder.
+The terminal is where you type the commands below.
 
-### Windows
+1. In VS Code choose **Terminal > New Terminal** from the top menu. (Shortcut: **Ctrl + `**, the key under Esc.)
+2. A panel opens at the bottom. It is already "inside" your project folder.
 
-**Easiest way (File Explorer):**
-1. Open the project folder in File Explorer (the folder that contains `app.py`).
-2. Click the address bar at the top, type `powershell`, and press **Enter**.
-3. A blue PowerShell window opens already inside the right folder.
+To open **another** terminal at any time, click the **+** icon at the top right of the terminal panel. To close one, click the trash-can icon.
 
-**Or from the Start menu:**
-1. Press the **Windows key**, type `PowerShell`, press **Enter**.
-2. Go to the project folder. If you cloned it to your Desktop, type:
-   ```powershell
-   cd $HOME\Desktop\ASIM-AD
-   ```
-   (Change `ASIM-AD` to whatever your folder is called.)
+**Check you are in the right place.** Run this. You should see `app.py` and `requirements.txt` in the list.
 
-### macOS
+Windows: `dir`  
+macOS / Linux: `ls`
 
-1. Press **Cmd + Space**, type `Terminal`, press **Enter**.
-2. Go to the project folder. If it is on your Desktop:
-   ```bash
-   cd ~/Desktop/ASIM-AD
-   ```
+If you do not, you are in the wrong folder. Use **File > Open Folder** and pick the folder that contains `app.py`, then open a new terminal.
 
-Tip: you can also type `cd ` (with a space), then drag the folder from Finder into the Terminal window and press Enter.
-
-### Linux
-
-1. Press **Ctrl + Alt + T**.
-2. Go to the folder:
-   ```bash
-   cd ~/Desktop/ASIM-AD
-   ```
-
-### Using VS Code instead
-
-1. Open VS Code, choose **File > Open Folder**, and pick the project folder.
-2. Open a terminal with **Terminal > New Terminal** (or press **Ctrl + `**). It opens already inside the project folder.
-
-### Check you are in the right place
-
-Run this. You should see `app.py` and `requirements.txt` in the list.
-
-**Windows:** `dir`  
-**macOS / Linux:** `ls`
+**Which terminal type?** On Windows the terminal is normally **PowerShell** (shown at the top right of the panel). All commands below for "Windows" work in PowerShell. You can switch type with the small **down-arrow** next to the **+** icon.
 
 ---
 
@@ -154,14 +138,16 @@ python -m venv .venv
 .venv\Scripts\Activate.ps1
 ```
 
-If you see a red error about *"running scripts is disabled on this system"*, run this once and then try the activate line again:
+If you see a red error about *"running scripts is disabled on this system"*, run these two lines instead:
 
 ```powershell
 Set-ExecutionPolicy -Scope Process -ExecutionPolicy Bypass
 .venv\Scripts\Activate.ps1
 ```
 
-### Windows (Command Prompt / cmd)
+If `python` is not recognised, use `py -m venv .venv` for the first line.
+
+### Windows (Command Prompt)
 
 ```bat
 python -m venv .venv
@@ -176,6 +162,8 @@ source .venv/bin/activate
 ```
 
 **How to tell it worked:** your terminal line now starts with `(.venv)`.
+
+**VS Code may pop up** *"We noticed a new environment has been created. Do you want to select it?"* Click **Yes**. If it does not appear, press **Ctrl + Shift + P**, type `Python: Select Interpreter`, and choose the one that says `.venv`.
 
 ---
 
@@ -204,15 +192,17 @@ After a few seconds you will see:
   Local URL: http://localhost:8501
 ```
 
-Your browser should open by itself. If it does not, open it and go to:
+Your browser should open by itself. If it does not, open a browser and go to:
 
 **<http://localhost:8501>**
 
-Leave the terminal window open while you use the app. Closing it stops the app.
+(In VS Code you can also hold **Ctrl** and click the link in the terminal.)
+
+Leave the terminal running while you use the app. Closing it stops the app.
 
 **The first analysis is slower** (around 10 to 30 seconds) because it downloads a small sentiment dictionary once and fetches fresh data. After that, results are cached and repeat runs are quick.
 
-To stop the app, click the terminal and press **Ctrl + C**.
+**To stop the app:** click inside the terminal and press **Ctrl + C**.
 
 ---
 
@@ -224,7 +214,7 @@ To stop the app, click the terminal and press **Ctrl + C**.
 4. **Weight on fundamentals:** how much the company's own numbers count versus the news. `60` means 60% numbers, 40% news. Not sure? Leave it at 60.
 5. Press **Run analysis** and watch the four agents work.
 6. Read the **ranked table**. The bar in each row shows how much of the score came from company numbers (teal) and news (black). The thin lines mark 40 and 70.
-7. Click a stock name under **Inspect a stock** for its full breakdown, a plain-English summary, a chart, and the news headlines it was based on.
+7. Click a stock under **Inspect a stock** for its full breakdown, a plain-English summary, a chart, and the news headlines it was based on.
 
 Hover over (or tap) any small `?` to see what a term means.
 
@@ -240,7 +230,7 @@ Hover over (or tap) any small `?` to see what a term means.
 
 ## 9. Next time you want to run it
 
-You do **not** repeat the install. Open a terminal in the project folder (step 4), then:
+You do **not** repeat the install. Open VS Code, choose **File > Open Recent** and pick the project, open a new terminal (**Ctrl + `**), then:
 
 **Windows (PowerShell)**
 ```powershell
@@ -254,17 +244,99 @@ source .venv/bin/activate
 streamlit run app.py
 ```
 
-Want it updated to the latest code? Run `git pull` first, then `pip install -r requirements.txt` again.
+To get the latest code from GitHub first, run `git pull`, then `pip install -r requirements.txt` again.
 
 ---
 
-## 10. Troubleshooting
+## 10. Push your changes to GitHub
+
+Do this after you edit files (for example `app.py`) and want them on GitHub. You must have opened the project with **Option A (clone)** in step 3.
+
+### One-time setup: tell Git who you are
+
+Run these two lines once on your computer (use your own name and the email of your GitHub account):
+
+```bash
+git config --global user.name "Your Name"
+git config --global user.email "you@example.com"
+```
+
+### Method 1: Using the VS Code buttons (no commands)
+
+1. Click the **Source Control** icon in the left bar (it looks like a branch), or press **Ctrl + Shift + G**.
+2. You will see a list of changed files. Click the **+** next to each file to *stage* it, or click the **+** next to "Changes" to stage all of them.
+3. Type a short message in the box, such as `Update README`.
+4. Click **Commit**. (If VS Code asks to stage everything automatically, click **Always** or **Yes**.)
+5. Click **Sync Changes** (or **Publish Branch / Push**). If a pop-up asks to confirm, click **OK**.
+
+### Method 2: Using the terminal
+
+Open a terminal (**Ctrl + `**) in the project folder and run these in order:
+
+```bash
+git status
+git add .
+git commit -m "Describe what you changed"
+git push
+```
+
+What each line does:
+- `git status` shows what changed.
+- `git add .` stages every changed file. Your `.venv` folder is already ignored, so it will not be uploaded.
+- `git commit -m "..."` saves a snapshot with your message.
+- `git push` uploads it to GitHub.
+
+### The first time you push, you will be asked to sign in
+
+A browser window opens asking you to **sign in to GitHub** and **authorize Visual Studio Code / Git Credential Manager**. Click **Authorize**, then go back to VS Code. You only do this once.
+
+### You must have permission to push
+
+If you see `Permission denied` or `403`, your GitHub account is not allowed to write to this repository. Either:
+- Ask the owner (**Butcherboy7**) to add you: GitHub repo > **Settings > Collaborators > Add people**, then accept the email invite; **or**
+- Click **Fork** on the GitHub page to make your own copy, clone *your* copy, push there, and open a **Pull Request**.
+
+### Always pull before you push if others also edit
+
+```bash
+git pull
+```
+
+### Using the ZIP (Option B) and want to push to your own repository
+
+A ZIP has no Git history. To upload it to **your own new empty repository** on GitHub (create one at <https://github.com/new> first), run in the project folder:
+
+```bash
+git init
+git add .
+git commit -m "First commit"
+git branch -M main
+git remote add origin https://github.com/YOUR-USERNAME/YOUR-REPO.git
+git push -u origin main
+```
+
+Replace `YOUR-USERNAME/YOUR-REPO` with your own. Do not use this to push into someone else's existing repository.
+
+### Common push errors
+
+| What you see | What to do |
+|---|---|
+| `not a git repository` | You opened the wrong folder, or used a ZIP. Open the cloned folder, or use the ZIP steps above. |
+| `Author identity unknown` | Run the two `git config --global` lines above, then commit again. |
+| `rejected ... fetch first` or `non-fast-forward` | Someone pushed before you. Run `git pull --rebase`, then `git push`. |
+| `Authentication failed` | Sign in again when the browser opens, or run `git push` once more. |
+| `Permission denied` / `403` | You are not a collaborator. See "You must have permission to push". |
+| `nothing to commit` | You have no new changes. Edit and save a file first. |
+
+---
+
+## 11. Troubleshooting
 
 **`python` is not recognized / command not found**
-Windows: try `py -m venv .venv` instead of `python -m venv .venv`. If that also fails, reinstall Python and tick *Add python.exe to PATH*. macOS / Linux: use `python3`.
+Windows: try `py -m venv .venv` instead of `python -m venv .venv`. If that also fails, reinstall Python and tick *Add python.exe to PATH*, then restart VS Code. macOS / Linux: use `python3`.
 
 **`streamlit` is not recognized**
-Your virtual environment is not active. Run the activate command from step 5 (you should see `(.venv)`), or run the app with:
+Your virtual environment is not active. Run the activate command from step 5 (you should see `(.venv)`), or run:
 ```bash
 python -m streamlit run app.py
 ```
@@ -303,7 +375,7 @@ Hard refresh the browser (**Ctrl + Shift + R**, or **Cmd + Shift + R** on macOS)
 
 ---
 
-## 11. How it works
+## 12. How it works
 
 Four small agents run as a pipeline. Stocks are analysed in parallel, and the app shows each agent's progress live.
 
@@ -323,7 +395,7 @@ Data sources: [yfinance](https://github.com/ranaroussi/yfinance), Google News RS
 
 ---
 
-## 12. Project structure
+## 13. Project structure
 
 ```
 .
@@ -348,7 +420,7 @@ Data sources: [yfinance](https://github.com/ranaroussi/yfinance), Google News RS
 
 ---
 
-## 13. Limitations and disclaimer
+## 14. Limitations and disclaimer
 
 - Built for a college demo, not for real trading.
 - Focused on NSE-listed Indian stocks.
